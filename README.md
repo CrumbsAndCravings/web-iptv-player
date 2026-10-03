@@ -10,7 +10,7 @@ It works through **the helper on your computer**, the small program in the Samsu
 
 ## What it does
 
-- **Home, Movies, Series, Categories and Search** along the bottom, as on the TV. Home has a big picture of what you were watching (or the newest title) with **Resume**, then Continue Watching and up to 18 rows: new releases first, then movies and series taking turns, with each of your languages taking turns. Each row scrolls sideways and ends with **See all**.
+- **Home, Movies, Series, Categories and Search** in a floating glass tab bar, as in iOS 26: a glass bubble behind the tab you're on springs to the next one, swells when pressed, and follows your finger if you drag along the bar. Home has a big picture of what you were watching (or the newest title) with **Resume**, then Continue Watching and up to 18 rows: new releases first, then movies and series taking turns, with each of your languages taking turns. Each row scrolls sideways and ends with **See all**.
 - **Your languages.** Categories are read for their language and tidied (`EN ✪ ACTION` becomes "Action"); with languages set in `personal.json` (or in Settings on the phone), the others are left out of every tab and of search.
 - **A category's page** lists every title in it, newest first, with a search box that narrows it as you type.
 - **Search** covers your whole library, kept on the phone: Categories, Movies and Series rows that update as you type. The first time, the library loads in the background (gently, a couple of lists at a time); after that it's searched at once and refreshed once a day.

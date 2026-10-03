@@ -56,7 +56,11 @@
   --pad-l: max(16px, var(--safe-left));
   --pad-r: max(16px, var(--safe-right));
   --header-h: 52px;
-  --tabbar-h: 56px;
+  /* The floating tab bar: its height, how far it floats above the bottom (just over the
+     home indicator, as iOS 26's does), and the room it takes. */
+  --tabbar-h: 62px;
+  --tabbar-bottom: max(10px, calc(var(--safe-bottom) - 10px));
+  --tabbar-space: calc(var(--tabbar-h) + var(--tabbar-bottom));
   /* About three and a bit posters across a phone; bigger on a tablet or computer. */
   --poster-w: clamp(102px, 29vw, 168px);
   --poster-gap: 8px;

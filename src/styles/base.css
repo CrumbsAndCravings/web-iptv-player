@@ -193,7 +193,7 @@ p {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 16px);
+  bottom: calc(var(--tabbar-space) + 14px);
   z-index: 50;
   max-width: calc(100% - 32px);
   padding: 10px 16px;
