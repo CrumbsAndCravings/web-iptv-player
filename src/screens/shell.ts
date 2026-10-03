@@ -64,7 +64,7 @@ export class Shell implements Screen {
     const account = onTap(iconButton("round-button header-account", ICONS.account, "Account and settings"), () => this.app.push(new SettingsScreen(this.app, () => this.reloadAll())));
     this.header = h("header", { class: "shell-header" }, [h("div", { class: "logo" }, [h("span", { class: "logo-name", text: "ARAN" }), h("span", { class: "logo-plus", text: "+" })]), account]);
     this.lens = h("div", { class: "tab-lens", attrs: { "aria-hidden": "true" } });
-    const bar = h("nav", { class: "tab-bar", attrs: { "aria-label": "Sections" } }, [this.lens]);
+    const bar = h("nav", { class: "tab-bar", attrs: { "aria-label": "Sections" } });
     this.bar = bar;
     for (const tab of TABS) {
       const el = h("button", { class: "tab", attrs: { type: "button", "aria-label": tab.label } });
@@ -74,6 +74,8 @@ export class Shell implements Screen {
       this.tabEls[tab.name] = el;
       bar.appendChild(el);
     }
+    // Last, so the tabs stay the bar's first children (it sits beneath them anyway).
+    bar.appendChild(this.lens);
     this.dragAlongBar();
     const stack = h("div", { class: "views" }, TABS.map((tab) => this.views[tab.name].el));
     this.el = h("div", { class: "shell" }, [stack, this.header, bar]);
