@@ -20,7 +20,7 @@
 // download.
 
 import type { App, Screen } from "../app";
-import { factsKey, FileFacts, helperVideoMode, learnMode, playRoute, rememberNeedsHelper, Route, VideoMode } from "../core/compat";
+import { factsKey, FileFacts, helperVideoMode, learnedMode, learnMode, playRoute, rememberNeedsHelper, Route, VideoMode } from "../core/compat";
 import type { Item } from "../core/items";
 import { log, logError } from "../core/log";
 import type { FindRequest } from "../core/opensubtitles";
@@ -118,6 +118,7 @@ export class PlayerScreen implements Screen {
   private controlsShown = false;
   private panel: Panel = "";
   private hash = "";
+  private waitingForTap = false; // Safari refused to start without a tap
 
   // Audio & subtitles
   private audioOpts: TrackOption[] = [];
@@ -191,6 +192,10 @@ export class PlayerScreen implements Screen {
     if (!canPip(this.video)) this.pipButton.classList.add("is-hidden");
 
     this.listen();
+    // Safari only lets a video start with sound from a tap. The player opens on one (Play,
+    // an episode), but the video starts seconds later, once the helper is ready; asking
+    // now, while the tap still counts, lets it start by itself then.
+    this.video.play().catch(() => undefined);
     this.startItem(startSecs);
   }
 
@@ -336,7 +341,7 @@ export class PlayerScreen implements Screen {
       this.helperTried = true;
       this.helperFromStart = true;
     }
-    this.helperVideo = helperVideoMode(item.videoCodec, canPlayHevc());
+    this.helperVideo = helperVideoMode(item.videoCodec);
     this.show(this.spinner, true);
     this.showControls();
     this.hashThenLoad();
@@ -388,7 +393,8 @@ export class PlayerScreen implements Screen {
     // The first time, the helper picks the sound in the language chosen before.
     const audioLanguage = this.audioTrack < 0 ? loadPrefs().audio || "" : "";
     log("play via helper", factsOf(item).key, "from", from, this.helperVideo, "audio", this.audioTrack < 0 ? audioLanguage || "first" : this.audioTrack, "attempt", this.attempt + 1);
-    const request = startHls(item, { start: from, video: this.helperVideo, audioTrack: this.audioTrack, audioLanguage, height: CONVERT_HEIGHT });
+    const hevc = canPlayHevc() && learnedMode("hevc") !== "convert";
+    const request = startHls(item, { start: from, video: this.helperVideo, audioTrack: this.audioTrack, audioLanguage, height: CONVERT_HEIGHT, hevc });
     this.starting = request;
     request.promise.then(
       (session) => {
@@ -442,9 +448,12 @@ export class PlayerScreen implements Screen {
     const playing = this.video.play();
     if (playing && playing.catch) {
       playing.catch((err: Error) => {
-        // Safari wants a tap before sound plays when the page wasn't tapped just now.
+        // Safari wants a tap before sound plays when the page wasn't tapped just now: wait
+        // for one, without counting the wait as a stream that never started.
         log("play() refused:", err.name);
         if (err.name === "NotAllowedError") {
+          window.clearTimeout(this.stallTimer);
+          this.waitingForTap = true;
           this.show(this.spinner, false);
           this.showControls();
           this.note("Tap play to start.", NOTE_MS);
@@ -490,6 +499,8 @@ export class PlayerScreen implements Screen {
 
   private onStarted(): void {
     this.started = true;
+    // A jump that restarted the helper is done once the new stream plays.
+    this.seeking = -1;
     window.clearTimeout(this.stallTimer);
     this.show(this.spinner, false);
     if (this.route === "helper") {
@@ -544,7 +555,7 @@ export class PlayerScreen implements Screen {
     }
     this.applyFinished();
     this.stopSource();
-    if (this.route === "helper") stopHelper();
+    if (this.route === "helper" && this.session) stopHelper(this.session.session);
     if (hasNext(this.watching, this.index)) this.showUpNext();
     else this.app.back();
   }
@@ -778,7 +789,11 @@ export class PlayerScreen implements Screen {
 
   private togglePause(): void {
     if (this.failed) return;
-    if (this.video.paused) this.play();
+    if (this.waitingForTap) {
+      this.waitingForTap = false;
+      this.play();
+      this.armStall(this.token, NEVER_STARTED_MS);
+    } else if (this.video.paused) this.play();
     else this.video.pause();
     this.restartHideTimer();
   }
@@ -1149,10 +1164,11 @@ export class PlayerScreen implements Screen {
     this.clearTimers();
     window.clearInterval(this.syncTimer);
     document.removeEventListener("visibilitychange", this.onVisibility);
-    const viaHelper = this.route === "helper" || this.starting !== null;
+    const session = this.route === "helper" && this.session ? this.session.session : "";
+    // A session still starting is stopped by the helper itself once this request is gone.
     this.stopSource();
     // Frees the provider's one connection for the next title (or the TV).
-    if (viaHelper) stopHelper();
+    stopHelper(session);
     if (document.fullscreenElement) document.exitFullscreen().catch(() => undefined);
     this.app.library?.hold(false);
     // Right after leaving a video, so another device can pick up where this one stopped.

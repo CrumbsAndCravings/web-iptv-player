@@ -54,15 +54,19 @@ export async function attachHls(video: HTMLVideoElement, url: string, onFatal: (
   // A growing playlist is played from its start, never pulled to its end like live TV.
   const player = new Hls({ startPosition: 0, liveDurationInfinity: false, maxBufferLength: 60, backBufferLength: 120 });
   let stopped = false;
+  let recovered = false;
   player.on(Hls.Events.ERROR, (_event, data) => {
-    if (stopped) return;
-    log("hls.js:", data.type, data.details, data.fatal ? "(fatal)" : "");
-    if (!data.fatal) return;
-    if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+    if (stopped || !data.fatal) return;
+    log("hls.js:", data.type, data.details, "(fatal)");
+    // A hiccup in decoding gets one more go; a picture or sound this browser can't
+    // decode at all (bufferAddCodecError) doesn't.
+    if (data.type === Hls.ErrorTypes.MEDIA_ERROR && !recovered && data.details !== "bufferAddCodecError") {
+      recovered = true;
       player.recoverMediaError();
       return;
     }
-    onFatal("HLS " + data.details);
+    stopped = true;
+    onFatal(data.details === "bufferAddCodecError" ? "DECODE (this browser can't play this picture or sound)" : "HLS " + data.details);
   });
   player.loadSource(url);
   player.attachMedia(video);

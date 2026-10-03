@@ -81,11 +81,10 @@ export function learnMode(codec: string, mode: VideoMode): void {
   writeJson("helper", "modes", next);
 }
 
-// What to ask the helper to do with the picture: keep H.264, keep HEVC where it plays,
-// convert everything else.
-export function helperVideoMode(codec: string, hevc: boolean): VideoMode {
-  const c = codec.trim().toLowerCase();
-  if (c !== "h264" && c !== "hevc") return "convert";
-  if (c === "hevc" && !hevc) return "convert";
-  return learnedMode(c) || "copy";
+// What to ask the helper to do with the picture. It knows the file's real format (the
+// provider's listing can be wrong or missing), keeps H.264, keeps HEVC when told this
+// device plays it, and converts the rest; so "copy" unless this format had to be
+// converted here before.
+export function helperVideoMode(codec: string): VideoMode {
+  return learnedMode(codec.trim().toLowerCase()) === "convert" ? "convert" : "copy";
 }

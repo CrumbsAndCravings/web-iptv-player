@@ -91,6 +91,7 @@ export interface HlsSubtitle {
 }
 
 export interface HlsStart {
+  session: string; // the helper's name for it
   url: string; // the playlist
   start: number; // seconds into the file where it begins
   duration: number; // the whole file's, seconds (0 when unknown)
@@ -108,6 +109,7 @@ export interface HlsOptions {
   audioTrack: number; // -1: the first in `audioLanguage`, else the file's first
   audioLanguage: string;
   height: number;
+  hevc: boolean; // this device plays HEVC pictures, so the helper may keep them
 }
 
 // Starts converting from `start` seconds; resolves once the first pieces are ready
@@ -118,6 +120,7 @@ export function startHls(item: Item, options: HlsOptions): { promise: Promise<Hl
       ...titleParams(item),
       start: Math.max(0, Math.floor(options.start)),
       video: options.video,
+      hevc: options.hevc,
       ...(options.audioTrack >= 0 ? { a: options.audioTrack } : options.audioLanguage ? { alang: options.audioLanguage } : {}),
       audio: "aac",
       height: options.height,
@@ -132,6 +135,7 @@ export function startHls(item: Item, options: HlsOptions): { promise: Promise<Hl
     const audio = field(data, "audio");
     const subtitles = field(data, "subtitles");
     return {
+      session: fieldStr(data, "session"),
       url: fieldStr(data, "url"),
       start: toInt(field(data, "start")),
       duration: toInt(field(data, "duration")),
@@ -150,9 +154,10 @@ export function startHls(item: Item, options: HlsOptions): { promise: Promise<Hl
   return { promise, abort: request.abort };
 }
 
-// Stops FFmpeg and frees the provider's one connection (leaving the player).
-export function stopHelper(): void {
-  send({ url: helperUrl("/v1/stop"), timeoutMs: 5000 });
+// Stops the session's FFmpeg and frees the provider's one connection (leaving the
+// player). Only that session: the TV may have started something on the helper since.
+export function stopHelper(session: string): void {
+  if (session) send({ url: helperUrl("/v1/stop", { session }), timeoutMs: 5000 });
 }
 
 // The file's OpenSubtitles moviehash ("" when it can't be had).
