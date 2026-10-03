@@ -1,0 +1,230 @@
+/* Pages with a header and a back button: a category's page, Settings, Online subtitles,
+   and the connect and starting screens. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+}
+.page-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: calc(var(--safe-top) + 6px) var(--pad-r) 8px max(10px, var(--safe-left));
+  background: var(--bg);
+  border-bottom: 1px solid rgba(201, 184, 255, 0.08);
+}
+.page-header .round-button {
+  background: transparent;
+}
+.page-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 20px;
+  line-height: 1.2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.page-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px var(--pad-r) calc(var(--safe-bottom) + 32px) var(--pad-l);
+}
+.page-intro {
+  color: var(--text-dim);
+  margin: 8px 0 16px;
+  line-height: 1.5;
+}
+.page-count {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin: 10px 0;
+}
+.page-message {
+  color: var(--text-dim);
+  margin: 16px 0;
+}
+.page-message:empty {
+  display: none;
+}
+
+/* Forms. */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 520px;
+}
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.form-label {
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+}
+.form-hint {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.form-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.form-status {
+  color: var(--butter);
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+.form-status.is-good {
+  color: var(--focus);
+}
+.form-status:empty {
+  display: none;
+}
+
+.tips {
+  margin-top: 28px;
+  padding: 16px;
+  border-radius: var(--radius-card);
+  background: var(--surface-1);
+  max-width: 520px;
+}
+.tips h2 {
+  font-family: var(--font-display);
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+.tips p {
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1.5;
+  margin-top: 6px;
+}
+
+/* Settings. */
+.settings .setting {
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(201, 184, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.settings .setting h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 17px;
+}
+.settings .setting p {
+  line-height: 1.5;
+}
+.checks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-self: stretch;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  font-size: 16px;
+}
+.check input {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--focus);
+}
+.setting-link {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  font-size: 16px;
+}
+.setting-link span:first-child {
+  flex: 1;
+  text-align: left;
+}
+.log {
+  align-self: stretch;
+  margin: 4px 0 0;
+  padding: 12px;
+  border-radius: var(--radius-card);
+  background: var(--surface-1);
+  color: var(--text-dim);
+  font: 12px/1.45 ui-monospace, Menlo, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  -webkit-user-select: text;
+  user-select: text;
+  max-height: 50vh;
+  overflow: auto;
+}
+.about {
+  margin-top: 20px;
+  font-size: 13px;
+}
+
+/* A category's page: the search box over the grid. */
+.page .search-field {
+  margin-bottom: 4px;
+}
+
+/* Connecting, and starting up. */
+.connect .page-body,
+.splash {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  max-width: 560px;
+  margin: 0 auto;
+  width: 100%;
+}
+.connect .page-title {
+  white-space: normal;
+  font-size: 26px;
+  text-align: center;
+  margin-top: 18px;
+}
+.connect .page-intro {
+  text-align: center;
+}
+.steps {
+  margin: 0 0 22px;
+  padding-left: 22px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.steps li {
+  margin: 6px 0;
+}
+.splash {
+  align-items: center;
+  gap: 26px;
+}
+.splash-spinner,
+.player-spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid rgba(201, 184, 255, 0.25);
+  border-top-color: var(--focus);
+  animation: spin 900ms linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,0 +1,69 @@
+/* Action sheets: buttons sliding up from the bottom over a dimmed screen. */
+
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+.sheet-shade {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  transition: opacity 220ms;
+}
+.sheet-panel {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px var(--pad-r) calc(var(--safe-bottom) + 14px) var(--pad-l);
+  border-radius: 12px 12px 0 0;
+  background: var(--surface-1);
+  transform: translate(-50%, 100%);
+  transition: transform 260ms var(--ease-out);
+}
+.sheet.is-open .sheet-shade {
+  opacity: 1;
+}
+.sheet.is-open .sheet-panel {
+  transform: translate(-50%, 0);
+}
+.sheet-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 18px;
+  text-align: center;
+}
+.sheet-message {
+  color: var(--text-dim);
+  text-align: center;
+  margin-bottom: 6px;
+  line-height: 1.45;
+}
+.sheet-button {
+  min-height: 50px;
+  border-radius: var(--radius-button);
+  background: var(--pill);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 16px;
+}
+.sheet-button:active {
+  background: var(--pill-selected);
+}
+.sheet-button.is-danger {
+  color: var(--pink);
+}
+.sheet-button.is-primary {
+  background: var(--focus);
+  color: var(--on-focus);
+}
+.sheet-button.is-cancel {
+  background: transparent;
+  color: var(--text-dim);
+}

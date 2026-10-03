@@ -1,0 +1,409 @@
+/* The player: the video fills the screen; the controls fade in over it. */
+
+.player {
+  background: #000;
+  position: absolute;
+  inset: 0;
+  color: var(--text);
+  animation: fade-in 200ms ease-out;
+}
+.player-stage {
+  position: absolute;
+  inset: 0;
+}
+.player-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+/* Subtitles: Safari draws them; these are their colours and size. */
+.player-video::cue {
+  font-family: var(--font-body);
+  font-weight: 800;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.player-controls {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms;
+  background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0) 22%, rgba(0, 0, 0, 0) 62%, rgba(0, 0, 0, 0.8));
+}
+.player.controls-shown .player-controls {
+  opacity: 1;
+  pointer-events: auto;
+}
+.player-controls * {
+  pointer-events: auto;
+}
+
+.player-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(var(--safe-top) + 8px) var(--pad-r) 0 max(12px, var(--safe-left));
+}
+.player-heading {
+  min-width: 0;
+}
+.player-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.player-subtitle-line {
+  color: var(--text-dim);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-middle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(28px, 10vw, 72px);
+}
+.player-play {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(21, 16, 40, 0.55);
+}
+.player-play svg {
+  width: 34px;
+  height: 34px;
+}
+.player-skip {
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+.player-skip svg {
+  width: 34px;
+  height: 34px;
+}
+.player-play:active,
+.player-skip:active {
+  background: rgba(201, 184, 255, 0.25);
+}
+
+.player-bottom {
+  padding: 0 var(--pad-r) calc(var(--safe-bottom) + 8px) var(--pad-l);
+}
+.player-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.player-time {
+  flex: none;
+  min-width: 44px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+.player-time.is-right {
+  text-align: right;
+}
+.player-bar {
+  position: relative;
+  flex: 1;
+  height: 36px;
+  touch-action: none;
+  cursor: pointer;
+}
+.bar-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 16px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(247, 243, 255, 0.22);
+  overflow: hidden;
+}
+/* How far the video can jump without the helper starting again. */
+.bar-buffer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(247, 243, 255, 0.28);
+}
+.bar-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--pink);
+}
+.bar-knob {
+  position: absolute;
+  top: 11px;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  border-radius: 50%;
+  background: var(--focus);
+  box-shadow: 0 0 0 4px rgba(201, 184, 255, 0.25);
+}
+.bar-bubble {
+  position: absolute;
+  bottom: 34px;
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  border-radius: var(--radius-button);
+  background: var(--focus);
+  color: var(--on-focus);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.bar-bubble.is-visible {
+  opacity: 1;
+}
+
+.player-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-top: 2px;
+}
+.player-tools::-webkit-scrollbar {
+  display: none;
+}
+.player-tools-gap {
+  flex: 1;
+}
+.player-tool {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: var(--radius-button);
+  font-family: var(--font-display);
+  font-size: 14px;
+  white-space: nowrap;
+}
+.player-tool:active {
+  background: rgba(201, 184, 255, 0.2);
+}
+.player-tool svg {
+  width: 22px;
+  height: 22px;
+}
+.player-tool.is-icon {
+  padding: 0 8px;
+}
+/* Narrow screens: icons only for the labelled buttons too. */
+@media (max-width: 420px) {
+  .player-tool span {
+    display: none;
+  }
+}
+
+.player-spinner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin: -20px 0 0 -20px;
+  display: none;
+}
+.player-spinner.is-visible {
+  display: block;
+}
+.player.controls-shown .player-spinner.is-visible {
+  /* The play button sits there; the spinner moves just above it. */
+  margin-top: -96px;
+}
+
+.player-note {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--safe-top) + 64px);
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 8px 14px;
+  border-radius: var(--radius-button);
+  background: rgba(30, 23, 54, 0.92);
+  color: var(--text);
+  font-size: 14px;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms;
+}
+.player-note.is-visible {
+  opacity: 1;
+}
+
+/* Cards: the error, and Up Next. */
+.player-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(560px, calc(100% - 32px));
+  max-height: calc(100% - var(--safe-top) - var(--safe-bottom) - 32px);
+  overflow-y: auto;
+  padding: 20px;
+  border-radius: var(--radius-card);
+  background: rgba(30, 23, 54, 0.97);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+  display: none;
+}
+.player-card.is-visible {
+  display: block;
+  animation: fade-in 200ms ease-out;
+}
+.player-card-eyebrow {
+  color: var(--pink);
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 1.5px;
+}
+.player-card-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 20px;
+  margin: 4px 0 8px;
+}
+.player-card-detail {
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.player-card-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+.player-card-buttons .button {
+  flex: 1;
+}
+
+/* Audio & subtitles, and Episodes: a panel from the right (from the bottom when the
+   phone is upright). */
+.player-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-1);
+  padding-right: var(--safe-right);
+  transform: translateX(100%);
+  transition: transform 260ms var(--ease-out);
+  visibility: hidden;
+}
+.player-panel.is-visible {
+  transform: none;
+  visibility: visible;
+}
+@media (orientation: portrait) {
+  .player-panel {
+    top: auto;
+    left: 0;
+    width: 100%;
+    max-height: 72%;
+    border-radius: 12px 12px 0 0;
+    transform: translateY(100%);
+    padding-right: 0;
+  }
+}
+.player-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: max(12px, var(--safe-top)) 12px 6px 18px;
+}
+@media (orientation: portrait) {
+  .player-panel-head {
+    padding-top: 12px;
+  }
+}
+.player-panel-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 18px;
+}
+.player-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 12px calc(var(--safe-bottom) + 16px);
+}
+.panel-heading {
+  color: var(--pink);
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  margin: 16px 6px 6px;
+}
+.panel-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 46px;
+  padding: 8px 10px;
+  border-radius: var(--radius-button);
+  text-align: left;
+  font-size: 15px;
+  color: var(--text);
+}
+.panel-option:active {
+  background: var(--pill);
+}
+.panel-option.is-on {
+  color: var(--focus);
+}
+.panel-option.is-busy {
+  color: var(--text-faint);
+}
+.panel-option svg {
+  width: 20px;
+  height: 20px;
+}
+.panel-empty {
+  color: var(--text-faint);
+  padding: 8px 10px;
+}
+.panel-note {
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 14px 10px 0;
+}

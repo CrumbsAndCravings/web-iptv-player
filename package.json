@@ -1,0 +1,34 @@
+{
+  "name": "aranplus-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ARAN+ for iPhone: a cosy, Netflix-style IPTV player built on the Xtream Codes API, as a web app served by the ARAN+ helper.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "dev": "node tools/dev.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build",
+    "screens": "node dev/screens.mjs",
+    "icons": "node tools/make_icons.mjs",
+    "sample": "node tools/make_sample.mjs"
+  },
+  "dependencies": {
+    "hls.js": "^1.6.13"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
+    "playwright-core": "^1.63.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^5.0.3"
+  }
+}

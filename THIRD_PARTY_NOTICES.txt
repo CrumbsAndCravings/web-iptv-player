@@ -1,0 +1,9 @@
+ARAN+ for iPhone includes the following third-party software and fonts.
+
+hls.js (only downloaded by browsers that don't play HLS themselves)
+Copyright (c) 2017 Dailymotion (http://www.dailymotion.com)
+https://github.com/video-dev/hls.js
+Licensed under the Apache License, Version 2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+Fredoka and Nunito fonts: SIL Open Font License 1.1, see OFL-Fredoka.txt and
+OFL-Nunito.txt.

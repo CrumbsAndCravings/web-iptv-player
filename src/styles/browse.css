@@ -1,0 +1,291 @@
+/* Home, Movies, Series, Categories and Search: the hero, rows of posters, and grids. */
+
+/* --- The hero, at the top of Home --- */
+.hero {
+  position: relative;
+  min-height: min(68vh, 560px);
+  display: flex;
+  align-items: flex-end;
+  margin-bottom: 6px;
+}
+.hero.is-empty {
+  min-height: calc(var(--header-h) + var(--safe-top));
+}
+.hero.is-empty > * {
+  display: none;
+}
+.hero-art {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center 20%;
+  animation: fade-in 500ms ease-out;
+}
+.hero-art.is-poster {
+  background-position: center 30%;
+}
+.hero-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(21, 16, 40, 0.55) 0%, rgba(21, 16, 40, 0) 22%, rgba(21, 16, 40, 0) 45%, rgba(21, 16, 40, 0.85) 78%, var(--bg) 100%);
+}
+.hero-body {
+  position: relative;
+  width: 100%;
+  padding: 0 var(--pad-r) 8px var(--pad-l);
+  animation: float-up 350ms var(--ease-out);
+}
+.hero-eyebrow {
+  color: var(--pink);
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  margin-bottom: 4px;
+}
+.hero-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(26px, 7.5vw, 40px);
+  line-height: 1.1;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.5);
+}
+.hero-meta {
+  color: var(--text-dim);
+  font-size: 14px;
+  margin-top: 6px;
+}
+.hero-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+.hero-buttons .button {
+  flex: 1;
+  max-width: 260px;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes float-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+/* --- Rows --- */
+.row {
+  margin: 18px 0 6px;
+}
+.row-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 17px;
+  margin: 0 var(--pad-r) 8px var(--pad-l);
+}
+.row-strip {
+  display: flex;
+  gap: var(--poster-gap);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  scroll-padding-left: var(--pad-l);
+  padding: 2px var(--pad-r) 4px var(--pad-l);
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.row-strip::-webkit-scrollbar {
+  display: none;
+}
+.row-strip > * {
+  scroll-snap-align: start;
+}
+
+.browse-status {
+  display: none;
+  margin: 24px var(--pad-r) 0 var(--pad-l);
+  color: var(--text-dim);
+}
+.browse-status.is-visible {
+  display: block;
+}
+.browse-status .pill {
+  margin-top: 12px;
+}
+.rows-sentinel {
+  height: 1px;
+}
+
+/* --- Posters --- */
+.poster {
+  position: relative;
+  display: block;
+  flex: 0 0 var(--poster-w);
+  width: var(--poster-w);
+  text-align: left;
+  transition: transform 140ms var(--ease-out);
+}
+.poster:active {
+  transform: scale(0.96);
+}
+.poster-card {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-poster);
+  overflow: hidden;
+  background: var(--surface-1);
+}
+.poster-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  -webkit-user-drag: none;
+}
+.poster-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  padding: 10px 8px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--text-dim);
+  background: linear-gradient(160deg, var(--pill-selected), var(--surface-1));
+}
+.poster-badge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 14px 6px 5px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  color: var(--text);
+  background: linear-gradient(rgba(21, 16, 40, 0), rgba(21, 16, 40, 0.92));
+}
+.poster-badge.has-progress {
+  bottom: 3px;
+}
+.poster-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(247, 243, 255, 0.25);
+}
+.poster-fill {
+  height: 100%;
+  background: var(--pink);
+}
+.poster-more {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(21, 16, 40, 0.7);
+  color: var(--text);
+}
+.poster-more svg {
+  width: 16px;
+  height: 16px;
+}
+.poster.is-placeholder .poster-card {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.poster.is-see-all .poster-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--pill-selected);
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--focus);
+}
+
+/* Category cards: the tidy name on a tinted card with a pink edge. */
+.poster.is-category {
+  flex-basis: calc(var(--poster-w) * 1.45);
+  width: calc(var(--poster-w) * 1.45);
+}
+.poster.is-category .poster-card {
+  aspect-ratio: auto;
+  min-height: 84px;
+  height: 100%;
+  padding: 12px 12px 10px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: var(--surface-2);
+  border-left: 3px solid var(--pink);
+}
+.poster-category-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 1.2;
+}
+.poster-category-caption {
+  color: var(--text-dim);
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+/* --- Grids --- */
+.poster-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px var(--poster-gap);
+}
+.poster-grid .poster {
+  width: auto;
+}
+
+.category-group {
+  margin: 18px 0 8px;
+}
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--poster-gap);
+  padding: 0 var(--pad-r) 0 var(--pad-l);
+}
+.category-grid .poster.is-category {
+  width: auto;
+}
+
+/* --- Search --- */
+.view.search .search-field {
+  display: block;
+  width: calc(100% - var(--pad-l) - var(--pad-r));
+  margin: 4px var(--pad-r) 8px var(--pad-l);
+}
+.search-status {
+  color: var(--text-faint);
+  font-size: 13px;
+  margin: 0 var(--pad-r) 4px var(--pad-l);
+}
+.rows.is-empty .view-intro {
+  margin-top: 16px;
+}

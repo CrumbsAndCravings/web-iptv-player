@@ -1,0 +1,7 @@
+node_modules/
+dist/
+out/
+.DS_Store
+.env
+# Sample videos for the dev harness (npm run sample).
+dev/media/

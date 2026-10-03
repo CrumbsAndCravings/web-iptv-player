@@ -1,0 +1,223 @@
+/* The page, screens, and shared building blocks: buttons, pills, fields, logo. */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  overscroll-behavior: none;
+}
+
+body {
+  color: var(--text);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+svg {
+  flex: none;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  overflow: hidden;
+  animation: screen-in 280ms var(--ease-out);
+}
+/* Covered by the screen above: kept laid out (so its scroll places stay), not drawn. */
+.screen.is-covered {
+  visibility: hidden;
+}
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.is-hidden {
+  display: none !important;
+}
+
+.dim {
+  color: var(--text-dim);
+}
+
+/* The ARAN+ wordmark. */
+.logo {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 24px;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  color: var(--text);
+}
+.logo-plus {
+  color: var(--pink);
+  margin-left: 1px;
+}
+.logo.is-large {
+  font-size: 44px;
+  text-align: center;
+}
+
+/* Buttons: lavender for the main one, plum for the rest. */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: var(--radius-button);
+  background: var(--pill);
+  color: var(--pill-text);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 16px;
+  transition: transform 120ms, background-color 120ms;
+}
+.button:active {
+  transform: scale(0.97);
+  background: var(--pill-selected);
+}
+.button.is-primary {
+  background: var(--focus);
+  color: var(--on-focus);
+}
+.button.is-primary:active {
+  background: var(--lavender);
+}
+.button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius-button);
+  background: var(--pill);
+  color: var(--pill-text);
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 15px;
+  white-space: nowrap;
+}
+.pill.is-selected {
+  background: var(--focus);
+  color: var(--on-focus);
+}
+
+.round-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(21, 16, 40, 0.6);
+  color: var(--text);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.round-button:active {
+  background: var(--pill-selected);
+}
+
+/* Text boxes: 16 px, so Safari doesn't zoom in when one is tapped. */
+.field {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 14px;
+  border-radius: var(--radius-button);
+  border: 1px solid var(--pill-selected);
+  background: var(--surface-2);
+  color: var(--text);
+  font: 600 16px var(--font-body);
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+}
+.field:focus {
+  border-color: var(--focus);
+}
+.field::placeholder {
+  color: var(--text-faint);
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 16px);
+  z-index: 50;
+  max-width: calc(100% - 32px);
+  padding: 10px 16px;
+  border-radius: var(--radius-button);
+  background: var(--pill-selected);
+  color: var(--text);
+  font-size: 14px;
+  text-align: center;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transform: translate(-50%, 12px);
+  transition: opacity 200ms, transform 200ms var(--ease-out);
+  pointer-events: none;
+}
+.toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
