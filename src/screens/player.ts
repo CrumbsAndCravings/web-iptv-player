@@ -82,6 +82,7 @@ export class PlayerScreen implements Screen {
   private bubbleEl: HTMLElement;
   private noteEl: HTMLElement;
   private spinner: HTMLElement;
+  private waitEl: HTMLElement;
   private errorEl: HTMLElement;
   private upNextEl: HTMLElement;
   private panelEl: HTMLElement;
@@ -132,6 +133,7 @@ export class PlayerScreen implements Screen {
   private tracksApplied = false;
 
   private hideTimer = 0;
+  private waitTimers: number[] = [];
   private stallTimer = 0;
   private stuckTimer = 0;
   private retryTimer = 0;
@@ -185,10 +187,11 @@ export class PlayerScreen implements Screen {
       ]),
     ]);
     this.spinner = h("div", { class: "player-spinner" });
+    this.waitEl = h("div", { class: "player-wait", attrs: { role: "status" } });
     this.errorEl = h("div", { class: "player-card player-error" });
     this.upNextEl = h("div", { class: "player-card player-upnext" });
     this.panelEl = h("div", { class: "player-panel" });
-    this.el = h("div", { class: "player" }, [this.stage, this.controls, this.noteEl, this.spinner, this.errorEl, this.upNextEl, this.panelEl]);
+    this.el = h("div", { class: "player" }, [this.stage, this.controls, this.noteEl, this.spinner, this.waitEl, this.errorEl, this.upNextEl, this.panelEl]);
     if (!canPip(this.video)) this.pipButton.classList.add("is-hidden");
 
     this.listen();
@@ -397,10 +400,12 @@ export class PlayerScreen implements Screen {
     const hevc = canPlayHevc() && learnedMode("hevc") !== "convert";
     const request = startHls(item, { start: from, video: this.helperVideo, audioTrack: this.audioTrack, audioLanguage, height: CONVERT_HEIGHT, hevc });
     this.starting = request;
+    this.waitingFor(token);
     request.promise.then(
       (session) => {
         if (token !== this.token || this.closing) return;
         this.starting = null;
+        this.doneWaiting();
         const first = this.session === null;
         this.session = session;
         this.offset = session.start;
@@ -416,6 +421,7 @@ export class PlayerScreen implements Screen {
       (err: Error) => {
         if (token !== this.token) return;
         this.starting = null;
+        this.doneWaiting();
         this.handleError("HELPER: " + err.message);
       },
     );
@@ -436,6 +442,28 @@ export class PlayerScreen implements Screen {
       if (this.subSource.kind === "embedded") this.loadFileSubtitles(this.subSource.id, true);
       else this.rebuildCues();
     });
+  }
+
+  // While the helper gets a film ready (the provider, then FFmpeg), say what it's
+  // waiting for, rather than a spinner alone.
+  private waitingFor(token: number): void {
+    this.doneWaiting();
+    const say = (text: string) => {
+      if (token === this.token && !this.closing) {
+        setText(this.waitEl, text);
+        this.show(this.waitEl, true);
+      }
+    };
+    this.waitTimers = [
+      window.setTimeout(() => say("Your computer is getting this from your provider…"), 4000),
+      window.setTimeout(() => say("Still waiting for your provider. The helper's window on your computer says what it's doing."), 25000),
+    ];
+  }
+
+  private doneWaiting(): void {
+    for (const timer of this.waitTimers) window.clearTimeout(timer);
+    this.waitTimers = [];
+    this.show(this.waitEl, false);
   }
 
   private armStall(token: number, ms: number): void {
@@ -465,6 +493,7 @@ export class PlayerScreen implements Screen {
 
   private stopSource(): void {
     this.token++;
+    this.doneWaiting();
     if (this.starting) {
       this.starting.abort();
       this.starting = null;

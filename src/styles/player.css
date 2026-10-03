@@ -242,6 +242,26 @@
   margin-top: -96px;
 }
 
+.player-wait {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 40px);
+  transform: translateX(-50%);
+  width: min(420px, calc(100% - 48px));
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1.45;
+  text-align: center;
+  display: none;
+}
+.player-wait.is-visible {
+  display: block;
+  animation: fade-in 300ms ease-out;
+}
+.player.controls-shown .player-wait {
+  top: calc(50% + 56px);
+}
+
 .player-note {
   position: absolute;
   left: 50%;
