@@ -99,6 +99,8 @@ async function startHls(params) {
   args.push("-f", "hls", "-hls_time", "6", "-hls_list_size", "0", "-hls_playlist_type", "event", "-hls_flags", "independent_segments+temp_file");
   args.push("-hls_segment_type", "fmp4", "-hls_fmp4_init_filename", "init.mp4", "-hls_segment_filename", path.join(dir, "seg%05d.m4s"), path.join(dir, "index.m3u8"));
   info.subtitles.forEach((sub, n) => args.push("-map", "0:s:" + n, "-c:s", "webvtt", "-flush_packets", "1", "-f", "webvtt", path.join(dir, "sub" + n + ".vtt")));
+  // A picture of each six-second piece, for dragging the bar, as the real helper makes.
+  if (vod) args.push("-map", "0:V:0", "-vf", "fps=1/6,scale=-2:180", "-q:v", "5", "-f", "image2", "-frame_pts", "1", path.join(dir, "p%05d.jpg"));
   const child = spawn("ffmpeg", args);
   running = child;
   let stderr = "";
@@ -138,13 +140,19 @@ async function startHls(params) {
     audioPlan: info.audio[track] && info.audio[track].codec === "aac" ? "copy" : "aac",
     audio: info.audio,
     subtitles: info.subtitles.map((s, n) => ({ index: n, language: s.language, title: "", forced: false, url: base + "sub" + n + ".vtt" })),
+    previews: vod ? { every: 6, prefix: base + "p" } : null,
   };
 }
 
 async function serveSessionFile(res, id, name) {
   const session = sessions.get(id);
-  if (!session || !/^(index\.m3u8|init\.mp4|seg\d{5}\.m4s|sub\d\.vtt)$/.test(name)) return json(res, 404, { error: "That stream has ended." });
+  if (!session || !/^(index\.m3u8|init\.mp4|seg\d{5}\.m4s|sub\d\.vtt|p\d{5}\.jpg)$/.test(name)) return json(res, 404, { error: "That stream has ended." });
   const file = path.join(session.dir, name);
+  if (name.endsWith(".jpg")) {
+    if (!existsSync(file)) return json(res, 404, { error: "Not converted yet." });
+    res.writeHead(200, { "Content-Type": "image/jpeg", "Content-Length": statSync(file).size, "Cache-Control": "private, max-age=86400" });
+    return createReadStream(file).pipe(res);
+  }
   if (session.vod && name === "index.m3u8") {
     res.writeHead(200, { "Content-Type": "application/vnd.apple.mpegurl", "Cache-Control": "no-store" });
     return res.end(vodPlaylist(session));

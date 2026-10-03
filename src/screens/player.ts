@@ -34,7 +34,7 @@ import { activeSubtitle, freshOnline, NUDGE_MS, OnlineStatus, SubtitleSource, su
 import { audioNowText, audioOptions, subtitleOptions, TrackOption } from "../core/tracks";
 import { codecLabel, describeCodecs, episodeCode, formatClock } from "../core/utils";
 import { currentOf, dueForSave, entryFor, finishedChange, hasNext, resumeFrom, saveAction, Watching } from "../core/watch";
-import { fileUrl, helperHash, helperLastError, HlsStart, startHls, stopHelper } from "../data/helper";
+import { fileUrl, helperHash, helperLastError, HlsStart, previewUrl, startHls, stopHelper } from "../data/helper";
 import { OsClient } from "../data/opensubtitles";
 import { send } from "../platform/http";
 import { attachFile, attachHls, Attached, canPip, canPlayHevc, enterFullscreen, mediaErrorLabel, togglePip } from "../platform/video";
@@ -53,6 +53,7 @@ const CHECK_STREAM_MS = 10000;
 const SUBTITLE_REFRESH_MS = 15000; // the file's own subtitles grow while the helper works
 const CONVERT_HEIGHT = 1080; // pictures the helper converts are made no taller than this
 const NOTE_MS = 6000;
+const PREVIEW_RETRY_MS = 10000; // a picture not made yet is asked for again after this
 
 function factsOf(item: Item): FileFacts {
   return { key: factsKey(item.kind, item.itemId), ext: item.ext, videoCodec: item.videoCodec, audioCodec: item.audioCodec };
@@ -80,6 +81,8 @@ export class PlayerScreen implements Screen {
   private bufferEl: HTMLElement;
   private knobEl: HTMLElement;
   private bubbleEl: HTMLElement;
+  private previewEl: HTMLElement;
+  private previewImg: HTMLImageElement;
   private noteEl: HTMLElement;
   private spinner: HTMLElement;
   private waitEl: HTMLElement;
@@ -120,6 +123,13 @@ export class PlayerScreen implements Screen {
   private panel: Panel = "";
   private hash = "";
   private waitingForTap = false; // Safari refused to start without a tap
+
+  // The picture above the bar while dragging it (whole-film streams): the one on its
+  // way (one at a time), the one showing, and those the helper hasn't made yet (with
+  // when it said so, to ask again later).
+  private previewLoading = "";
+  private previewShown = "";
+  private previewMissing: { [url: string]: number } = {};
 
   // Audio & subtitles
   private audioOpts: TrackOption[] = [];
@@ -170,7 +180,14 @@ export class PlayerScreen implements Screen {
     this.fillEl = h("div", { class: "bar-fill" });
     this.knobEl = h("div", { class: "bar-knob" });
     this.bubbleEl = h("div", { class: "bar-bubble" });
-    this.bar = h("div", { class: "player-bar", attrs: { role: "slider", "aria-label": "Position" } }, [h("div", { class: "bar-track" }, [this.bufferEl, this.fillEl]), this.knobEl, this.bubbleEl]);
+    this.previewImg = h("img", { attrs: { alt: "" } });
+    this.previewEl = h("div", { class: "bar-preview" }, [this.previewImg]);
+    this.bar = h("div", { class: "player-bar", attrs: { role: "slider", "aria-label": "Position" } }, [
+      h("div", { class: "bar-track" }, [this.bufferEl, this.fillEl]),
+      this.knobEl,
+      this.previewEl,
+      this.bubbleEl,
+    ]);
     const tracksButton = onTap(iconButton("player-tool", ICONS.subtitles, "Audio & subtitles", true), () => this.openPanel("tracks"));
     this.episodesButton = onTap(iconButton("player-tool", ICONS.episodes, "Episodes", true), () => this.openPanel("episodes"));
     this.nextButton = onTap(iconButton("player-tool", ICONS.next, "Next episode", true), () => this.playNext());
@@ -424,6 +441,9 @@ export class PlayerScreen implements Screen {
         this.doneWaiting();
         const first = this.session === null;
         this.session = session;
+        // Another session's pictures are another film's (or another sound track's).
+        this.previewShown = "";
+        this.previewMissing = {};
         this.offset = session.start;
         this.lastTime = -1;
         if (session.duration > 0) this.duration = session.duration;
@@ -911,6 +931,47 @@ export class PlayerScreen implements Screen {
       setText(this.bubbleEl, formatClock(shown));
       this.bubbleEl.style.left = fraction * 100 + "%";
     }
+    this.renderPreview(shown, fraction);
+  }
+
+  // While dragging a whole-film stream: the picture of that moment, made by the helper
+  // from what it has converted (nothing more is asked of the provider). Where it hasn't
+  // converted yet there's no picture, just the time.
+  private renderPreview(seconds: number, fraction: number): void {
+    const url = this.dragging && this.session && this.session.vod ? previewUrl(this.session, seconds) : "";
+    if (!url) {
+      toggle(this.previewEl, "is-visible", false);
+      return;
+    }
+    // Over the knob, but kept on screen at either end.
+    const bar = this.bar.getBoundingClientRect();
+    const half = (this.previewEl.offsetWidth || 160) / 2;
+    const width = this.el.clientWidth || window.innerWidth;
+    const center = Math.max(half + 8, Math.min(width - half - 8, bar.left + fraction * bar.width));
+    this.previewEl.style.left = center - bar.left + "px";
+    const missing = this.previewMissing[url];
+    const knownMissing = missing !== undefined && Date.now() - missing < PREVIEW_RETRY_MS;
+    if (url !== this.previewShown && !knownMissing && !this.previewLoading) this.loadPreview(url);
+    // The last picture stays up while the next one comes.
+    toggle(this.previewEl, "is-visible", this.previewShown !== "" && !knownMissing);
+  }
+
+  private loadPreview(url: string): void {
+    this.previewLoading = url;
+    const loader = new Image();
+    const done = (ok: boolean) => {
+      this.previewLoading = "";
+      if (ok) {
+        this.previewImg.src = loader.src;
+        this.previewShown = url;
+        delete this.previewMissing[url];
+      } else this.previewMissing[url] = Date.now();
+      // The finger has moved on: the picture for where it is now.
+      if (this.dragging) this.renderBar();
+    };
+    loader.onload = () => done(true);
+    loader.onerror = () => done(false);
+    loader.src = url;
   }
 
   private note(text: string, ms = NOTE_MS): void {

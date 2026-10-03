@@ -106,6 +106,16 @@ export interface HlsStart {
   audioPlan: string; // "copy", "aac", ...
   audio: HlsTrack[];
   subtitles: HlsSubtitle[];
+  // Pictures of the film for dragging the bar, one every `every` seconds, made from what
+  // the helper has converted: `prefix` + the 5-digit number + ".jpg". Null without.
+  previews: { every: number; prefix: string } | null;
+}
+
+// The preview picture for `seconds` into the film, or "" without previews.
+export function previewUrl(session: HlsStart, seconds: number): string {
+  const previews = session.previews;
+  if (!previews || previews.every <= 0 || seconds < 0) return "";
+  return previews.prefix + String(Math.floor(seconds / previews.every)).padStart(5, "0") + ".jpg";
 }
 
 export interface HlsOptions {
@@ -141,6 +151,7 @@ export function startHls(item: Item, options: HlsOptions): { promise: Promise<Hl
     const data: Json = JSON.parse(res.text);
     const audio = field(data, "audio");
     const subtitles = field(data, "subtitles");
+    const previews = field(data, "previews");
     return {
       session: fieldStr(data, "session"),
       url: fieldStr(data, "url"),
@@ -158,6 +169,7 @@ export function startHls(item: Item, options: HlsOptions): { promise: Promise<Hl
       subtitles: isArr(subtitles)
         ? subtitles.filter(isObj).map((s) => ({ index: toInt(s.index), language: fieldStr(s, "language"), title: fieldStr(s, "title"), forced: s.forced === true, url: fieldStr(s, "url") }))
         : [],
+      previews: isObj(previews) && toInt(previews.every) > 0 && fieldStr(previews, "prefix") ? { every: toInt(previews.every), prefix: fieldStr(previews, "prefix") } : null,
     } as HlsStart;
   });
   return { promise, abort: request.abort };
