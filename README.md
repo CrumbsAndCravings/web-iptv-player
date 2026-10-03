@@ -6,7 +6,7 @@ It works through **the helper on your computer**, the small program in the Samsu
 
 - **It serves the app.** The iPhone opens the helper's address on your home Wi-Fi.
 - **It talks to your provider.** A web page can't call an IPTV provider itself (the provider doesn't allow it, and the page would need your password), so the helper asks for the lists with the login in `personal.json`. Your password never reaches the phone.
-- **It converts what Safari can't play.** Safari plays MP4 files, but not MKV (about 4 in 5 of the provider's movies), AVI, or DTS sound. The helper repackages those with FFmpeg into HLS, the streaming format Safari plays, while you watch. H.264 and HEVC pictures are kept as they are (no quality lost, little work for the computer); DivX and other old formats are converted to H.264; sound becomes AAC.
+- **It converts what Safari can't play.** Safari plays MP4 files, but not MKV (about 4 in 5 of the provider's movies), AVI, or DTS sound. The helper converts those with FFmpeg into HLS, the streaming format Safari plays, while you watch: H.264 pictures and AAC sound, in six-second pieces. The phone gets a playlist for the whole film at once, as from any streaming service, so it knows the length, starts in a few seconds and jumps by itself; the helper makes each piece as it's asked for.
 
 ## What it does
 
@@ -15,7 +15,7 @@ It works through **the helper on your computer**, the small program in the Samsu
 - **A category's page** lists every title in it, newest first, with a search box that narrows it as you type.
 - **Search** covers your whole library, kept on the phone: Categories, Movies and Series rows that update as you type. The first time, the library loads in the background (gently, a couple of lists at a time); after that it's searched at once and refreshed once a day.
 - **Details** for movies (Play, or Resume and Play from start) and series (season pills, and the episode list with stills, runtimes and synopses). **Remove from Continue Watching** when a title is on it; on Home, hold a Continue Watching poster (or tap ⋯) to remove it.
-- **The player.** Tap to show the controls: close and the title at the top, back 10 s, play/pause and forward 10 s in the middle, the bar with the times, then **Audio & subtitles**, **Episodes**, **Next episode**, picture in picture, AirPlay and full screen. Double-tap the left or right side to jump 10 s. Drag along the bar to jump anywhere; the lighter part of the bar is what the helper has converted already, where jumps are instant, and a jump further on takes a few seconds while the helper starts from there.
+- **The player.** Tap to show the controls: close and the title at the top, back 10 s, play/pause and forward 10 s in the middle, the bar with the times, then **Audio & subtitles**, **Episodes**, **Next episode**, picture in picture, AirPlay and full screen. Double-tap the left or right side to jump 10 s. Drag along the bar to jump anywhere; the lighter part of the bar is what the phone has loaded, where jumps are instant, and a jump further away takes a few seconds while the helper starts from there.
 - **Resume and Continue Watching**, as on the TV: progress is saved every 15 seconds and when you leave, resuming starts 5 seconds early, movies drop off when finished and series move on to the next episode. **Up Next** counts down 8 seconds at the end of an episode.
 - **Continue Watching on every device.** With the sync service in `personal.json`, the phone, the TV and the Roku share one list.
 - **Audio & subtitles.** Each sound track of the file with its language and format ("Hindi · AAC"); the language you pick is played first next time. The file's own text subtitles, and English subtitles from OpenSubtitles (Settings, Online subtitles), with **1s earlier / later** to fix their timing. Subtitles show in full screen and picture in picture too.
@@ -67,7 +67,7 @@ Pull both repos, run `npm run build` here again, and restart the helper. The pho
 - **At home only, as it stands.** The phone reaches the helper over your Wi-Fi. To watch elsewhere, the phone needs a private route to the computer: [Tailscale](https://tailscale.com) on both is the simple way; then open `http://<the computer's Tailscale name>:8090/app/?key=...` instead.
 - **The computer must be on, with the helper running,** while you browse and watch. If it isn't, ARAN+ says the helper didn't answer.
 - **One stream at a time.** The provider allows one connection, so the phone and the TV can't play at once; starting one stops the other.
-- **The computer's work.** Keeping the picture (H.264 and HEVC, nearly everything) is light. Converting (DivX, old formats) uses the graphics card or Intel Quick Sync when there is one, otherwise the processor.
+- **The computer's work.** For the phone, the helper converts the picture of every MKV and AVI to H.264, as fast as it can from where you are (so a film is usually converted well before you get there). It uses the graphics card or Intel Quick Sync when there is one, otherwise the processor; a recent processor manages several times faster than the film plays. MP4 files play as they are.
 - **Disk space.** While you watch, the helper keeps what it has converted in the computer's temp folder (roughly the size of the film), and deletes it a couple of minutes after you stop, or when it next starts.
 - **Picture subtitles** (PGS, DVD) inside a file can't be shown; text ones can, and online ones always work.
 
@@ -75,7 +75,7 @@ Pull both repos, run `npm run build` here again, and restart the helper. The pho
 
 - **"The helper on your computer didn't answer"**: check the computer is on and awake, the helper's window is open, and the phone is on the same Wi-Fi. If the computer's address changed, the helper prints the new link; give the computer a fixed address in your router to stop that.
 - **"The key in this app's address doesn't match"**: the helper's key changed (a new `personal.json`). Open the new link from the helper, then add it to the Home Screen again.
-- **A video won't start**: the error card says why. "Your computer says" lines come from the helper and FFmpeg; "HTTP 403 from ..." lines come from your provider.
+- **A video won't start**: the error card says why. "Your computer says" lines come from the helper and FFmpeg; "HTTP 403 from ..." lines come from your provider; "Safari:" says where the video was, how ready it was (0 to 4), what it had loaded and how many frames it showed. The helper's window says what it did: "Ready to play", then "The phone opened the stream" and "The phone is playing" once the phone asks for it.
 - **Settings** (the round button at the top right) has the recent log, with your account, server and keys hidden, so a screenshot is safe to share.
 
 ## Develop
@@ -102,7 +102,7 @@ iPhone (Safari)  ──── home Wi-Fi ────  computer: the helper  ─
   this app                              serves /app/                             player_api.php
   /v1/xtream (lists)        ───►        adds the login       ───►                the files
   /v1/file (MP4s as they are)           passes ranges on
-  /v1/hls/start (the rest)              FFmpeg: fMP4 HLS, WebVTT subtitles
+  /v1/hls/start (the rest)              FFmpeg: HLS (H.264, AAC), WebVTT subtitles
   /v1/fetch (OpenSubtitles)             passes on            ───►                OpenSubtitles
   sync (Continue Watching)  ─────────────────────────────────────────►          your Cloudflare Worker
 ```

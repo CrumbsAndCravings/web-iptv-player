@@ -241,6 +241,10 @@ export class PlayerScreen implements Screen {
       this.renderBar();
     });
     v.addEventListener("progress", () => this.renderBar());
+    // What Safari does, in the log (Settings), for when a video won't start.
+    for (const name of ["loadedmetadata", "canplay", "playing", "waiting", "stalled", "seeking", "seeked"]) {
+      v.addEventListener(name, () => log("video " + name + ":", this.videoState()));
+    }
     // AirPlay shows up when there's somewhere to send the video.
     v.addEventListener("webkitplaybacktargetavailabilitychanged", (event) => {
       const available = (event as unknown as { availability?: string }).availability === "available";
@@ -256,6 +260,18 @@ export class PlayerScreen implements Screen {
       else this.restartHideTimer();
     });
     this.listenToBar();
+  }
+
+  // Safari's video in a line, for the log and the error card: where it is, how ready
+  // (0 nothing to 4 plenty), its loading (2 loading, 1 idle, 3 nothing found), what it
+  // has loaded, and how many frames it has shown.
+  private videoState(): string {
+    const v = this.video;
+    const loaded: string[] = [];
+    for (let i = 0; i < v.buffered.length && i < 3; i++) loaded.push(formatClock(this.offset + v.buffered.start(i)) + "-" + formatClock(this.offset + v.buffered.end(i)));
+    let frames = "";
+    if (typeof v.getVideoPlaybackQuality === "function") frames = ", " + v.getVideoPlaybackQuality().totalVideoFrames + " frames shown";
+    return "at " + formatClock(this.offset + v.currentTime) + ", ready " + v.readyState + ", network " + v.networkState + (v.paused ? ", paused" : "") + ", loaded " + (loaded.join(" ") || "nothing") + frames;
   }
 
   private onStageTap(event: MouseEvent): void {
@@ -428,14 +444,31 @@ export class PlayerScreen implements Screen {
   }
 
   private attach(token: number, session: HlsStart): void {
-    attachHls(this.video, session.url, (reason) => {
-      if (token === this.token) this.handleError(reason);
-    }).then((attached) => {
+    attachHls(
+      this.video,
+      session.url,
+      (reason) => {
+        if (token === this.token) this.handleError(reason);
+      },
+      session.vod ? -1 : 0,
+    ).then((attached) => {
       if (token !== this.token) {
         attached.stop();
         return;
       }
       this.source = attached;
+      // A whole-film playlist names where to begin; if Safari begins elsewhere, move it.
+      if (session.vod && session.from > 0) {
+        const place = () => {
+          if (token !== this.token || this.started) return;
+          if (Math.abs(this.video.currentTime - session.from) > 3) {
+            log("helper: moving to", session.from, "from", Math.floor(this.video.currentTime));
+            this.video.currentTime = session.from;
+          }
+        };
+        if (this.video.readyState >= 1) place();
+        else this.video.addEventListener("loadedmetadata", place, { once: true });
+      }
       this.play();
       this.armStall(token, NEVER_STARTED_MS);
       // The file's own subtitles start again with the new session.
@@ -469,7 +502,7 @@ export class PlayerScreen implements Screen {
   private armStall(token: number, ms: number): void {
     window.clearTimeout(this.stallTimer);
     this.stallTimer = window.setTimeout(() => {
-      if (token === this.token && !this.started && !this.failed) this.handleError("NO_PROGRESS (it opened but never started)");
+      if (token === this.token && !this.started && !this.failed) this.handleError("NO_PROGRESS (it opened but never started). Safari: " + this.videoState());
     }, ms);
   }
 
@@ -554,7 +587,7 @@ export class PlayerScreen implements Screen {
         this.lastMoved = Date.now();
         return;
       }
-      if (Date.now() - this.lastMoved > STUCK_MS) this.handleError("STALLED (no new video for " + STUCK_MS / 1000 + " seconds)");
+      if (Date.now() - this.lastMoved > STUCK_MS) this.handleError("STALLED (no new video for " + STUCK_MS / 1000 + " seconds). Safari: " + this.videoState());
     }, 5000);
   }
 
@@ -600,7 +633,9 @@ export class PlayerScreen implements Screen {
 
   private seekTo(target: number): void {
     const t = clampSeek(target, this.duration);
-    if (this.route === "direct") {
+    // A file, or the helper's whole-film playlist: the video jumps by itself (the helper
+    // makes the pieces it asks for).
+    if (this.route === "direct" || (this.session && this.session.vod)) {
       this.seeking = t;
       this.video.currentTime = t;
       this.renderBar();
@@ -640,6 +675,13 @@ export class PlayerScreen implements Screen {
 
   private handleError(label: string): void {
     if (this.failed || this.closing) return;
+    // A whole-film playlist's length is the helper's estimate; a failure in the last
+    // seconds is the film ending.
+    if (this.started && this.session && this.session.vod && this.duration > 0 && this.position > this.duration - 20) {
+      log("helper: stopped in the last seconds, taken as the end:", label);
+      this.onEnded();
+      return;
+    }
     this.errors.push(label);
     logError("playback error:", label, "(" + this.route + ")");
     window.clearTimeout(this.stallTimer);
@@ -845,11 +887,23 @@ export class PlayerScreen implements Screen {
     const fraction = barFraction(shown, duration);
     this.fillEl.style.width = fraction * 100 + "%";
     this.knobEl.style.left = fraction * 100 + "%";
-    // How far the video can jump without the helper starting again.
-    const seekable = this.video.seekable;
+    // How far the video can jump without the helper starting again: what it has
+    // converted, or (a whole-film playlist) what the video has loaded around here.
     let reach = 0;
-    if (seekable && seekable.length > 0 && duration > 0) reach = barFraction(this.offset + seekable.end(seekable.length - 1), duration);
-    const from = this.route === "helper" ? barFraction(this.offset, duration) : 0;
+    let from = this.route === "helper" ? barFraction(this.offset, duration) : 0;
+    if (this.session && this.session.vod && duration > 0) {
+      const loaded = this.video.buffered;
+      const now = this.video.currentTime;
+      for (let i = 0; i < loaded.length; i++) {
+        if (loaded.end(i) >= now - 1 && loaded.start(i) <= now + 1) {
+          from = barFraction(loaded.start(i), duration);
+          reach = barFraction(loaded.end(i), duration);
+        }
+      }
+    } else {
+      const seekable = this.video.seekable;
+      if (seekable && seekable.length > 0 && duration > 0) reach = barFraction(this.offset + seekable.end(seekable.length - 1), duration);
+    }
     this.bufferEl.style.left = from * 100 + "%";
     this.bufferEl.style.width = Math.max(0, reach - from) * 100 + "%";
     toggle(this.bubbleEl, "is-visible", this.dragging);

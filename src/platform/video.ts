@@ -39,9 +39,10 @@ export interface Attached {
   stop(): void;
 }
 
-// Plays an HLS playlist in `video`. `onFatal` hears about failures hls.js can't recover
-// from; Safari reports its own through the video's "error" event.
-export async function attachHls(video: HTMLVideoElement, url: string, onFatal: (reason: string) => void): Promise<Attached> {
+// Plays an HLS playlist in `video`, from `startAt` seconds (-1: where the playlist says,
+// as Safari does). `onFatal` hears about failures hls.js can't recover from; Safari
+// reports its own through the video's "error" event.
+export async function attachHls(video: HTMLVideoElement, url: string, onFatal: (reason: string) => void, startAt = 0): Promise<Attached> {
   if (nativeHls()) {
     video.src = url;
     return { stop: () => detach(video) };
@@ -52,7 +53,7 @@ export async function attachHls(video: HTMLVideoElement, url: string, onFatal: (
     return { stop: () => undefined };
   }
   // A growing playlist is played from its start, never pulled to its end like live TV.
-  const player = new Hls({ startPosition: 0, liveDurationInfinity: false, maxBufferLength: 60, backBufferLength: 120 });
+  const player = new Hls({ startPosition: startAt, liveDurationInfinity: false, maxBufferLength: 60, backBufferLength: 120 });
   let stopped = false;
   let recovered = false;
   player.on(Hls.Events.ERROR, (_event, data) => {

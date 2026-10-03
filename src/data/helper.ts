@@ -93,7 +93,12 @@ export interface HlsSubtitle {
 export interface HlsStart {
   session: string; // the helper's name for it
   url: string; // the playlist
-  start: number; // seconds into the file where it begins
+  // The playlist lists the whole film (the helper makes each piece when it's asked for),
+  // so the video's clock is the film's and it jumps by itself. Otherwise the playlist
+  // grows from `start` as the helper converts.
+  vod: boolean;
+  from: number; // where a whole-film playlist starts playing, seconds
+  start: number; // seconds into the file where the video's clock starts
   duration: number; // the whole file's, seconds (0 when unknown)
   video: "copy" | "convert";
   videoCodec: string;
@@ -113,7 +118,8 @@ export interface HlsOptions {
 }
 
 // Starts converting from `start` seconds; resolves once the first pieces are ready
-// (the provider, then FFmpeg: a few seconds, sometimes more).
+// (the provider, then FFmpeg: a few seconds, sometimes more). The helper lists the whole
+// film when it knows its length, as Safari likes best.
 export function startHls(item: Item, options: HlsOptions): { promise: Promise<HlsStart>; abort: () => void } {
   const request = send({
     url: helperUrl("/v1/hls/start", {
@@ -126,6 +132,7 @@ export function startHls(item: Item, options: HlsOptions): { promise: Promise<Hl
       height: options.height,
       format: "fmp4",
       subs: true,
+      vod: 1,
     }),
     timeoutMs: 110000,
   });
@@ -137,6 +144,8 @@ export function startHls(item: Item, options: HlsOptions): { promise: Promise<Hl
     return {
       session: fieldStr(data, "session"),
       url: fieldStr(data, "url"),
+      vod: field(data, "vod") === true,
+      from: toInt(field(data, "from")),
       start: toInt(field(data, "start")),
       duration: toInt(field(data, "duration")),
       video: fieldStr(data, "video") === "convert" ? "convert" : "copy",

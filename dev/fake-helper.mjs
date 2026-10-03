@@ -8,7 +8,9 @@
 // VP9 and Opus with ARANPLUS_DEV_CODEC=vp9, for test browsers without H.264 (the
 // Chromium that npm run screens uses). Like the real helper, it starts from `start`
 // seconds, writes the file's own subtitles as WebVTT, and answers once two pieces are
-// ready.
+// ready. With vod=1 (as the app asks), it lists the whole sample in six-second pieces
+// as the real helper does, converting it from the start and answering each piece once
+// it's made (the real one starts FFmpeg again for a jump; a sample is quick enough).
 
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -61,6 +63,17 @@ function stopRunning() {
   running = null;
 }
 
+// The whole sample's playlist, in six-second pieces, starting at `from`.
+function vodPlaylist(session) {
+  const count = Math.max(1, Math.ceil(session.duration / 6));
+  const lines = ["#EXTM3U", "#EXT-X-VERSION:7", "#EXT-X-TARGETDURATION:6", "#EXT-X-MEDIA-SEQUENCE:0", "#EXT-X-PLAYLIST-TYPE:VOD", "#EXT-X-INDEPENDENT-SEGMENTS"];
+  if (session.from > 0) lines.push("#EXT-X-START:TIME-OFFSET=" + session.from + ",PRECISE=YES");
+  lines.push('#EXT-X-MAP:URI="init.mp4"');
+  for (let n = 0; n < count; n++) lines.push("#EXTINF:" + (n < count - 1 ? 6 : session.duration - 6 * (count - 1)).toFixed(3) + ",", "seg" + String(n).padStart(5, "0") + ".m4s");
+  lines.push("#EXT-X-ENDLIST");
+  return lines.join("\n") + "\n";
+}
+
 async function startHls(params) {
   const ext = (params.get("ext") || "mp4").toLowerCase();
   const file = sample(ext);
@@ -77,9 +90,12 @@ async function startHls(params) {
   mkdirSync(dir, { recursive: true });
   const video = VP9 ? ["-c:v", "libvpx-vp9", "-deadline", "realtime", "-cpu-used", "8", "-b:v", "800k", "-vf", "scale=-2:360", "-g", "48"] : ["-c:v", "libx264", "-preset", "veryfast", "-g", "48", "-pix_fmt", "yuv420p"];
   const audio = VP9 ? ["-c:a", "libopus", "-b:a", "96k", "-ac", "2"] : ["-c:a", "aac", "-b:a", "128k", "-ac", "2"];
+  const vod = params.get("vod") === "1" && info.duration > 0;
   const args = ["-hide_banner", "-nostdin", "-loglevel", "error"];
-  if (start > 0) args.push("-ss", String(start));
+  if (start > 0 && !vod) args.push("-ss", String(start));
   args.push("-i", file, "-map", "0:V:0?", "-map", "0:a:" + track + "?", ...video, ...audio, "-sn", "-dn");
+  // A keyframe every six seconds, so every piece is six seconds, as the playlist says.
+  if (vod) args.push("-force_key_frames", "expr:gte(t,n_forced*6)");
   args.push("-f", "hls", "-hls_time", "6", "-hls_list_size", "0", "-hls_playlist_type", "event", "-hls_flags", "independent_segments+temp_file");
   args.push("-hls_segment_type", "fmp4", "-hls_fmp4_init_filename", "init.mp4", "-hls_segment_filename", path.join(dir, "seg%05d.m4s"), path.join(dir, "index.m3u8"));
   info.subtitles.forEach((sub, n) => args.push("-map", "0:s:" + n, "-c:s", "webvtt", "-flush_packets", "1", "-f", "webvtt", path.join(dir, "sub" + n + ".vtt")));
@@ -87,7 +103,7 @@ async function startHls(params) {
   running = child;
   let stderr = "";
   child.stderr.on("data", (d) => (stderr = (stderr + d).slice(-4000)));
-  const session = { id, dir, ended: false };
+  const session = { id, dir, ended: false, vod, from: vod ? start : 0, duration: info.duration };
   sessions.set(id, session);
   child.on("close", () => {
     session.ended = true;
@@ -103,7 +119,8 @@ async function startHls(params) {
       text = "";
     }
     const pieces = (text.match(/^#EXTINF:/gm) || []).length;
-    if (pieces >= 2 || (pieces > 0 && /#EXT-X-ENDLIST/.test(text))) break;
+    const wanted = vod ? Math.floor(start / 6) + 1 : 2;
+    if (pieces >= wanted || (pieces > 0 && /#EXT-X-ENDLIST/.test(text))) break;
     if (session.ended || Date.now() > deadline) throw new Error("FFmpeg didn't make the first pieces: " + (stderr.trim() || "no reason given"));
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
@@ -111,7 +128,9 @@ async function startHls(params) {
   return {
     session: id,
     url: base + "index.m3u8",
-    start,
+    vod,
+    from: vod ? start : 0,
+    start: vod ? 0 : start,
     duration: info.duration,
     video: params.get("video") === "convert" ? "convert" : "copy",
     videoCodec: info.video,
@@ -122,10 +141,16 @@ async function startHls(params) {
   };
 }
 
-function serveSessionFile(res, id, name) {
+async function serveSessionFile(res, id, name) {
   const session = sessions.get(id);
   if (!session || !/^(index\.m3u8|init\.mp4|seg\d{5}\.m4s|sub\d\.vtt)$/.test(name)) return json(res, 404, { error: "That stream has ended." });
   const file = path.join(session.dir, name);
+  if (session.vod && name === "index.m3u8") {
+    res.writeHead(200, { "Content-Type": "application/vnd.apple.mpegurl", "Cache-Control": "no-store" });
+    return res.end(vodPlaylist(session));
+  }
+  // A piece not made yet is waited for.
+  for (let i = 0; session.vod && i < 240 && !existsSync(file) && !session.ended && !name.endsWith(".vtt"); i++) await new Promise((resolve) => setTimeout(resolve, 250));
   if (name.endsWith(".vtt") && !existsSync(file)) {
     res.writeHead(200, { "Content-Type": "text/vtt" });
     return res.end("WEBVTT\n\n");
@@ -146,7 +171,7 @@ export function handleFakeHelper(req, res, port) {
   if (!url.pathname.startsWith("/v1/")) return false;
   const piece = /^\/v1\/hls\/s\/([0-9a-f]{32})\/([^/]+)$/.exec(url.pathname);
   if (piece) {
-    serveSessionFile(res, piece[1], piece[2]);
+    serveSessionFile(res, piece[1], piece[2]).catch(() => res.destroy());
     return true;
   }
   if (url.searchParams.get("key") !== FAKE_KEY) {
