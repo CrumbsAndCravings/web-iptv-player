@@ -7,6 +7,7 @@
 import { Item, makeItem } from "../core/items";
 import { h, onHold, onTap } from "./dom";
 import { ICONS } from "./icons";
+import { noteTapped, stagger } from "./motion";
 
 export interface PosterActions {
   open(item: Item): void;
@@ -18,7 +19,10 @@ function image(src: string, className: string): HTMLImageElement | null {
   if (!src) return null;
   const img = h("img", { class: className, attrs: { alt: "", loading: "lazy", decoding: "async", draggable: "false" } });
   img.onerror = () => img.parentNode && img.parentNode.removeChild(img);
+  // Fades in once it's here (at once when it's cached), rather than drawing in strips.
+  img.onload = () => img.classList.add("is-loaded");
   img.src = src;
+  if (img.complete && img.naturalWidth > 0) img.classList.add("is-loaded");
   return img;
 }
 
@@ -39,7 +43,11 @@ export function posterEl(item: Item, actions: PosterActions): HTMLElement {
     card.appendChild(h("div", { class: "poster-progress" }, [h("div", { class: "poster-fill", attrs: { style: "width:" + Math.round(item.progress * 100) + "%" } })]));
   }
   const tile = h("button", { class: "poster", attrs: { type: "button", "aria-label": item.title } }, [card]);
-  onTap(tile, () => actions.open(item));
+  onTap(tile, () => {
+    // The page it opens grows out of this poster.
+    noteTapped(card);
+    actions.open(item);
+  });
   const more = actions.more;
   if (more) {
     onHold(tile, 550, () => more(item));
@@ -60,6 +68,8 @@ export function rowEl(title: string, items: Item[], actions: PosterActions, clas
   const fill = (list: Item[]) => {
     while (strip.firstChild) strip.removeChild(strip.firstChild);
     for (const item of list) strip.appendChild(posterEl(item, actions));
+    // The posters a phone shows build in from the left.
+    stagger(strip.children, 6);
   };
   fill(items);
   const el = h("section", { class: "row" + (className ? " " + className : "") }, [h("h2", { class: "row-title", text: title }), strip]);

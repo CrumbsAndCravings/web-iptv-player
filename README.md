@@ -21,6 +21,7 @@ It works through **the helper on your computer**, the small program in the Samsu
 - **Audio & subtitles.** Each sound track of the file with its language and format ("Hindi · AAC"); the language you pick is played first next time. The file's own text subtitles, and English subtitles from OpenSubtitles (Settings, Online subtitles), with **1s earlier / later** to fix their timing. Subtitles show in full screen and picture in picture too.
 - **Errors explain themselves**: what Safari said, what the file is, what the helper was doing and why it stopped ("Your computer says: ..."), and whether the provider refused the file.
 - **Lock screen and Control Center** show the title and artwork, with skip buttons.
+- **Motion, as on Netflix.** A poster grows into its title's page and shrinks back into its row (Safari's View Transitions, iOS 18 and newer; a page slides up on older ones). Pictures fade in as they arrive, rows and episode lists build in, Home's big picture settles in, a page's backdrop drifts and fades as you scroll, tabs fade across. In the player the controls slide in, double-tapping a side shows a ripple counting the seconds (keep tapping to add 10 more), the skip arrows turn and Up Next slides in. With Reduce Motion on, all of it is skipped.
 
 ## Set it up (once)
 

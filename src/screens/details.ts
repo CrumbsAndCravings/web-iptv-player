@@ -15,6 +15,7 @@ import { BACKDROP_SIZE, episodeItem, POSTER_SIZE, Season } from "../core/xtream"
 import { canPlayHevc } from "../platform/video";
 import { h, iconButton, onTap, setText, toggle } from "../ui/dom";
 import { ICONS } from "../ui/icons";
+import { fadeInBackground, reducedMotion, stagger, takeTapped } from "../ui/motion";
 import { playEpisode, playMovie, playOrder } from "./play";
 
 export class DetailsScreen implements Screen {
@@ -31,15 +32,22 @@ export class DetailsScreen implements Screen {
   private episodesEl: HTMLElement;
   private seasons: Season[] = [];
   private seasonIndex = 0;
+  private listedSeason = -1; // the season whose episodes are on screen
   private entry: ProgressEntry | null = null;
   private alive = true;
   private shownOnce = false;
+  // It grows out of the poster tapped to open it, and back into it.
+  readonly morphFrom: HTMLElement | null = takeTapped();
+  readonly morphTo: HTMLElement;
+  private full: HTMLElement; // the backdrop, fading in over the poster it starts as
 
   constructor(
     private app: App,
     private item: Item,
   ) {
-    this.art = h("div", { class: "details-art" });
+    this.full = h("div", { class: "details-art-full" });
+    this.art = h("div", { class: "details-art" }, [this.full]);
+    this.morphTo = this.art;
     this.titleEl = h("h1", { class: "details-title" });
     this.metaEl = h("div", { class: "details-meta" });
     this.plotEl = h("p", { class: "details-plot" });
@@ -50,13 +58,27 @@ export class DetailsScreen implements Screen {
     this.seasonsEl = h("div", { class: "season-strip", attrs: { role: "tablist" } });
     this.episodesEl = h("div", { class: "episodes" });
     const back = onTap(iconButton("round-button details-back", ICONS.back, "Back"), () => this.app.back());
-    this.el = h("div", { class: "details" }, [
-      h("div", { class: "details-scroll" }, [
-        this.art,
-        h("div", { class: "details-body" }, [this.titleEl, this.metaEl, this.buttonsEl, this.noteEl, this.plotEl, this.creditsEl, this.statusEl, this.seasonsEl, this.episodesEl]),
-      ]),
-      back,
+    const scroller = h("div", { class: "details-scroll" }, [
+      this.art,
+      h("div", { class: "details-body" }, [this.titleEl, this.metaEl, this.buttonsEl, this.noteEl, this.plotEl, this.creditsEl, this.statusEl, this.seasonsEl, this.episodesEl]),
     ]);
+    this.el = h("div", { class: "details" }, [scroller, back]);
+    // The backdrop drifts up more slowly than the page and fades, as on Netflix.
+    let frame = 0;
+    scroller.addEventListener(
+      "scroll",
+      () => {
+        if (frame || reducedMotion()) return;
+        frame = window.requestAnimationFrame(() => {
+          frame = 0;
+          const y = Math.max(0, scroller.scrollTop);
+          const height = this.art.offsetHeight || 1;
+          this.art.style.transform = y > 0 ? "translateY(" + Math.round(y * 0.45) + "px)" : "";
+          this.art.style.opacity = y > 0 ? String(Math.max(0, 1 - y / height)) : "";
+        });
+      },
+      { passive: true },
+    );
     this.showInfo();
     if (item.kind === "series") this.loadSeries();
     else this.loadMovie();
@@ -90,7 +112,15 @@ export class DetailsScreen implements Screen {
     setText(this.creditsEl, credits.join("  ·  "));
     const image = item.backdrop || (item.poster ? sizedImage(item.poster, BACKDROP_SIZE) : "");
     toggle(this.art, "is-poster", !item.backdrop);
-    if (image) this.art.style.backgroundImage = 'url("' + image.replace(/"/g, "%22") + '")';
+    // The poster from the list is there at once (it's loaded already), so the page has a
+    // picture to grow into; the backdrop fades in over it when it arrives.
+    if (item.poster && !this.art.style.backgroundImage) this.art.style.backgroundImage = 'url("' + item.poster.replace(/"/g, "%22") + '")';
+    if (image && image !== this.full.dataset.url) {
+      this.full.dataset.url = image;
+      this.full.classList.remove("is-loaded");
+      toggle(this.full, "is-poster", !item.backdrop);
+      fadeInBackground(this.full, image);
+    }
   }
 
   // --- Movies ---------------------------------------------------------------------
@@ -223,6 +253,12 @@ export class DetailsScreen implements Screen {
       const item = episodeItem(ep, this.item.itemId);
       this.episodesEl.appendChild(this.episodeEl(item, ep.episodeNo || i + 1));
     });
+    // A new season's episodes build in; the same ones listed again (back from the
+    // player) just appear.
+    const fresh = this.listedSeason !== this.seasonIndex;
+    this.listedSeason = this.seasonIndex;
+    toggle(this.episodesEl, "is-settled", !fresh);
+    if (fresh) stagger(this.episodesEl.children, 8);
   }
 
   private episodeEl(ep: Item, number: number): HTMLElement {
@@ -230,7 +266,9 @@ export class DetailsScreen implements Screen {
     if (ep.poster) {
       const img = h("img", { attrs: { alt: "", loading: "lazy", decoding: "async" } });
       img.onerror = () => img.remove();
+      img.onload = () => img.classList.add("is-loaded");
       img.src = ep.poster;
+      if (img.complete && img.naturalWidth > 0) img.classList.add("is-loaded");
       still.appendChild(img);
     }
     const play = h("span", { class: "episode-play" });

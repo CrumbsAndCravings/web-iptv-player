@@ -1,0 +1,450 @@
+/* Motion, as on Netflix (src/ui/motion.ts): pages grow out of posters, pictures fade in,
+   lists build in one after another, and the player answers every touch. Only opacity
+   and transform move, which the phone animates without effort. With Reduce Motion on,
+   base.css cuts every animation short and motion.ts skips the growing. */
+
+:root {
+  /* Arrives quickly and settles slowly; leaves gathering speed. */
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* --- Pages ---------------------------------------------------------------------- */
+
+/* A page slides in from the right and leaves the same way; Details rises like a card;
+   the tabs and the player fade. */
+.screen {
+  animation: screen-in 300ms var(--ease-emphasized);
+}
+.screen.details {
+  animation: details-in 380ms var(--ease-emphasized);
+}
+.screen.shell,
+.screen.player {
+  animation: fade-in 300ms ease-out;
+}
+/* Grown out of a poster instead (View Transitions, below). */
+.screen.is-morphed {
+  animation: none;
+}
+.screen.is-leaving {
+  animation: screen-out 240ms var(--ease-exit) forwards;
+  pointer-events: none;
+}
+.screen.details.is-leaving {
+  animation-name: details-out;
+}
+.screen.player.is-leaving {
+  animation-name: fade-out;
+}
+@keyframes details-in {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+}
+@keyframes screen-out {
+  to {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+}
+@keyframes details-out {
+  to {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+}
+
+/* The poster growing into its page (and back): Safari pictures the poster and the
+   page's backdrop and moves one into the other, cropping rather than squashing as the
+   shape changes from a poster's to a backdrop's. */
+::view-transition-group(aranplus-morph) {
+  animation-duration: 440ms;
+  animation-timing-function: var(--ease-emphasized);
+}
+::view-transition-image-pair(aranplus-morph) {
+  overflow: clip;
+}
+::view-transition-old(aranplus-morph),
+::view-transition-new(aranplus-morph) {
+  height: 100%;
+  object-fit: cover;
+  animation-duration: 440ms;
+}
+/* The rest of the page: the old one sinks back as the new one comes up. */
+::view-transition-old(root) {
+  animation: 260ms var(--ease-exit) both morph-out;
+}
+::view-transition-new(root) {
+  animation: 440ms var(--ease-emphasized) both morph-in;
+}
+@keyframes morph-out {
+  to {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+@keyframes morph-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* --- Tabs --------------------------------------------------------------------------- */
+
+.view.is-active {
+  animation: view-in 300ms var(--ease-emphasized);
+}
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+.tab.is-selected svg {
+  animation: tab-pop 360ms var(--ease-emphasized);
+}
+@keyframes tab-pop {
+  0% {
+    transform: scale(0.8);
+  }
+  55% {
+    transform: scale(1.12);
+  }
+}
+
+/* --- Posters and rows ------------------------------------------------------------- */
+
+/* Pictures fade in once they're here. */
+.poster-img,
+.episode-still img {
+  opacity: 0;
+  transition: opacity 360ms ease-out;
+}
+.poster-img.is-loaded,
+.episode-still img.is-loaded {
+  opacity: 1;
+}
+
+/* A row's posters (and a category's first screenful) build in from the left. */
+.row-strip > .poster:not(.is-placeholder),
+.poster-grid > .poster {
+  animation: poster-in 480ms var(--ease-emphasized) backwards;
+  animation-delay: calc(var(--i, 6) * 45ms);
+}
+@keyframes poster-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+}
+
+/* Loading posters shimmer, as Netflix's do. */
+.poster.is-placeholder .poster-card {
+  background: linear-gradient(100deg, var(--surface-1) 30%, var(--surface-2) 50%, var(--surface-1) 70%);
+  background-size: 300% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+/* How far you got fills in. */
+.poster-fill {
+  transform-origin: left center;
+  animation: fill-in 800ms var(--ease-emphasized) 250ms backwards;
+}
+@keyframes fill-in {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+/* --- Home's big picture ------------------------------------------------------------- */
+
+.hero-art {
+  opacity: 0;
+  transition: opacity 700ms ease-out;
+  animation: none;
+}
+.hero-art.is-loaded {
+  opacity: 1;
+  animation: hero-settle 1800ms var(--ease-emphasized);
+}
+@keyframes hero-settle {
+  from {
+    transform: scale(1.08);
+  }
+}
+.hero-body {
+  animation: none;
+}
+.hero-body > * {
+  animation: rise-in 560ms var(--ease-emphasized) backwards;
+}
+.hero-body > :nth-child(2) {
+  animation-delay: 70ms;
+}
+.hero-body > :nth-child(3) {
+  animation-delay: 140ms;
+}
+.hero-body > :nth-child(4) {
+  animation-delay: 210ms;
+}
+/* The same title shown again (its details arrived): no second entrance. */
+.hero.is-settled .hero-art,
+.hero.is-settled .hero-body > * {
+  animation: none;
+  transition: none;
+}
+
+/* --- Details ------------------------------------------------------------------------- */
+
+/* The poster is there at once; the backdrop fades in over it. */
+.details-art {
+  animation: none;
+  will-change: transform, opacity;
+}
+.details-art-full {
+  position: absolute;
+  inset: 0;
+  background: center / cover no-repeat;
+  opacity: 0;
+  transition: opacity 600ms ease-out;
+}
+.details-art-full.is-poster {
+  background-position: center 25%;
+}
+.details-art-full.is-loaded {
+  opacity: 1;
+}
+/* Then the words come up, one line after another. */
+.details-body > * {
+  animation: rise-in 500ms var(--ease-emphasized) backwards;
+}
+.details-body > :nth-child(1) {
+  animation-delay: 80ms;
+}
+.details-body > :nth-child(2) {
+  animation-delay: 120ms;
+}
+.details-body > :nth-child(3) {
+  animation-delay: 160ms;
+}
+.details-body > :nth-child(4) {
+  animation-delay: 200ms;
+}
+.details-body > :nth-child(n + 5) {
+  animation-delay: 240ms;
+}
+/* A season's episodes build in. */
+.episodes > .episode {
+  animation: rise-in 440ms var(--ease-emphasized) backwards;
+  animation-delay: calc(var(--i, 8) * 40ms);
+}
+.episodes.is-settled > .episode {
+  animation: none;
+}
+
+/* --- The player ------------------------------------------------------------------------ */
+
+/* The controls slide in from the edges as they fade in. */
+.player-top,
+.player-bottom,
+.player-middle {
+  transition: transform 280ms var(--ease-emphasized);
+}
+.player-top {
+  transform: translateY(-14px);
+}
+.player-bottom {
+  transform: translateY(14px);
+}
+.player-middle {
+  transform: scale(0.92);
+}
+.player.controls-shown .player-top,
+.player.controls-shown .player-bottom,
+.player.controls-shown .player-middle {
+  transform: none;
+}
+
+/* Play turning into pause pops; the skip arrows turn. */
+.player-play.is-popping svg {
+  animation: pop 320ms var(--ease-emphasized);
+}
+@keyframes pop {
+  from {
+    transform: scale(0.6);
+  }
+}
+.player-skip.is-spun svg,
+.player-skip-ripple.is-back.is-spun .skip-icon svg {
+  animation: turn-back 460ms var(--ease-emphasized);
+}
+.player-skip.is-forward.is-spun svg,
+.player-skip-ripple.is-forward.is-spun .skip-icon svg {
+  animation-name: turn-forward;
+}
+@keyframes turn-back {
+  40% {
+    transform: rotate(-45deg);
+  }
+}
+@keyframes turn-forward {
+  40% {
+    transform: rotate(45deg);
+  }
+}
+
+/* Double-tapping a side: a ripple from that edge, with the seconds adding up. */
+.player-skip-ripple {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 44%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #fff;
+  opacity: 0;
+  pointer-events: none;
+}
+.player-skip-ripple.is-back {
+  left: 0;
+  background: radial-gradient(ellipse 100% 75% at 0% 50%, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.06) 70%, rgba(255, 255, 255, 0) 71%);
+}
+.player-skip-ripple.is-forward {
+  right: 0;
+  background: radial-gradient(ellipse 100% 75% at 100% 50%, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.06) 70%, rgba(255, 255, 255, 0) 71%);
+}
+.player-skip-ripple.is-showing {
+  animation: ripple 900ms ease-out;
+}
+@keyframes ripple {
+  0% {
+    opacity: 0;
+  }
+  12%,
+  65% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.skip-icon svg {
+  width: 40px;
+  height: 40px;
+}
+.skip-label {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14px;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+}
+
+/* Dragging the bar: the knob grows, the picture of the moment rises into place. */
+.bar-knob {
+  transition: transform 160ms var(--ease-emphasized);
+}
+.player-bar.is-dragging .bar-knob {
+  transform: scale(1.35);
+}
+.bar-preview {
+  transform: translateX(-50%) translateY(6px) scale(0.94);
+  transition:
+    opacity 140ms,
+    transform 200ms var(--ease-emphasized);
+}
+.bar-preview.is-visible {
+  transform: translateX(-50%);
+}
+
+/* Up Next slides in from the right; an error card comes up. */
+.player-upnext.is-visible {
+  animation: upnext-in 460ms var(--ease-emphasized);
+}
+@keyframes upnext-in {
+  from {
+    opacity: 0;
+    transform: translate(calc(-50% + 48px), -50%);
+  }
+}
+.player-error.is-visible {
+  animation: card-in 320ms var(--ease-emphasized);
+}
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -46%) scale(0.96);
+  }
+}
+
+/* --- Starting up ------------------------------------------------------------------------ */
+
+/* ARAN comes in letter by letter, then the plus spins in; the spinner only shows if
+   starting takes a while. */
+.logo.is-intro .logo-letter,
+.logo.is-intro .logo-plus {
+  display: inline-block;
+}
+.logo.is-intro .logo-letter {
+  animation: letter-in 560ms var(--ease-emphasized) backwards;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+.logo.is-intro .logo-plus {
+  animation: plus-in 640ms var(--ease-emphasized) 330ms backwards;
+}
+@keyframes letter-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.9);
+  }
+}
+@keyframes plus-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.2) rotate(-180deg);
+  }
+  70% {
+    transform: scale(1.25) rotate(8deg);
+  }
+}
+.splash .splash-spinner {
+  animation:
+    spin 900ms linear infinite,
+    fade-in 300ms ease-out 900ms backwards;
+}
+.screen.splash {
+  animation: none;
+}
+
+/* Reduce Motion: no waiting in line either (base.css already cuts animations short). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-delay: 0s !important;
+  }
+}

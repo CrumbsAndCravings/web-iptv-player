@@ -83,8 +83,16 @@ function boot(): void {
 }
 
 // While the helper is asked for the first time.
+// The logo comes in letter by letter, the plus last with a little spin, while the app
+// starts; the spinner only shows if that takes a while.
 class Splash {
-  readonly el = h("div", { class: "page splash" }, [h("div", { class: "logo is-large" }, [h("span", { class: "logo-name", text: "ARAN" }), h("span", { class: "logo-plus", text: "+" })]), h("div", { class: "splash-spinner" })]);
+  readonly el = h("div", { class: "page splash" }, [
+    h("div", { class: "logo is-large is-intro", attrs: { "aria-label": "ARAN+" } }, [
+      ..."ARAN".split("").map((letter, i) => h("span", { class: "logo-letter", text: letter, attrs: { style: "--i:" + i, "aria-hidden": "true" } })),
+      h("span", { class: "logo-plus", text: "+", attrs: { "aria-hidden": "true" } }),
+    ]),
+    h("div", { class: "splash-spinner" }),
+  ]);
 }
 
 boot();

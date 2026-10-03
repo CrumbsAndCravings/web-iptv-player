@@ -23,6 +23,7 @@ import { BACKDROP_SIZE } from "../core/xtream";
 import { ApiError } from "../data/api";
 import { h, onTap, toggle } from "../ui/dom";
 import { ICONS } from "../ui/icons";
+import { fadeInBackground, noteTapped } from "../ui/motion";
 import { placeholders, PosterActions, rowEl } from "../ui/poster";
 import { CategoryScreen } from "./category";
 import { DetailsScreen } from "./details";
@@ -248,8 +249,12 @@ export class BrowseView {
     this.heroItem = item;
     const entry = progressFind(this.heroKey(item));
     const backdrop = item.backdrop || (item.poster ? sizedImage(item.poster, BACKDROP_SIZE) : "");
+    // The same title again (its details arrived): no second entrance.
+    const again = this.heroEl.dataset.title === item.itemId;
+    this.heroEl.dataset.title = item.itemId;
     const art = h("div", { class: "hero-art" + (item.backdrop ? "" : " is-poster") });
-    if (backdrop) art.style.backgroundImage = 'url("' + backdrop.replace(/"/g, "%22") + '")';
+    // The picture fades in and settles once it's here, rather than drawing in strips.
+    if (backdrop) fadeInBackground(art, backdrop);
     const play = h("button", { class: "button is-primary", attrs: { type: "button" } });
     play.innerHTML = ICONS.play;
     let label = "Play";
@@ -260,10 +265,14 @@ export class BrowseView {
       if (entry) resumeEntry(this.app, entry, item);
       else this.open(item);
     });
-    const more = onTap(h("button", { class: "button", text: "Details", attrs: { type: "button" } }), () => this.open(item));
+    const more = onTap(h("button", { class: "button", text: "Details", attrs: { type: "button" } }), () => {
+      // Its page grows out of the big picture.
+      noteTapped(art);
+      this.open(item);
+    });
     const meta = metaLine(item);
     this.heroEl.textContent = "";
-    this.heroEl.className = "hero";
+    this.heroEl.className = "hero" + (again ? " is-settled" : "");
     this.heroEl.appendChild(art);
     this.heroEl.appendChild(
       h("div", { class: "hero-body" }, [

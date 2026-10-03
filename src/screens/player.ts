@@ -54,6 +54,19 @@ const SUBTITLE_REFRESH_MS = 15000; // the file's own subtitles grow while the he
 const CONVERT_HEIGHT = 1080; // pictures the helper converts are made no taller than this
 const NOTE_MS = 6000;
 const PREVIEW_RETRY_MS = 10000; // a picture not made yet is asked for again after this
+const SKIP_ADD_MS = 1200; // double taps this close together add up their seconds
+
+// Plays a CSS animation again, from its start, by taking its class off and back on.
+function replay(el: HTMLElement, className: string): void {
+  el.classList.remove(className);
+  void el.offsetWidth;
+  el.classList.add(className);
+}
+
+// The circling arrow of a skip button turns, as on Netflix.
+function spin(el: HTMLElement): void {
+  replay(el, "is-spun");
+}
 
 function factsOf(item: Item): FileFacts {
   return { key: factsKey(item.kind, item.itemId), ext: item.ext, videoCodec: item.videoCodec, audioCodec: item.audioCodec };
@@ -123,6 +136,8 @@ export class PlayerScreen implements Screen {
   private panel: Panel = "";
   private hash = "";
   private waitingForTap = false; // Safari refused to start without a tap
+  private shownPaused: boolean | null = null; // what the play button shows
+  private skipEls: { el: HTMLElement; label: HTMLElement; total: number; at: number }[];
 
   // The picture above the bar while dragging it (whole-film streams): the one on its
   // way (one at a time), the one showing, and those the helper hasn't made yet (with
@@ -172,8 +187,19 @@ export class PlayerScreen implements Screen {
     this.subtitleLine = h("div", { class: "player-subtitle-line" });
     const close = onTap(iconButton("round-button", ICONS.close, "Close"), () => this.app.back());
     this.playButton = onTap(iconButton("player-play", ICONS.pause, "Pause"), () => this.togglePause());
-    const back10 = onTap(iconButton("player-skip", ICONS.back10, "Back 10 seconds"), () => this.jumpBy(-10));
-    const fwd10 = onTap(iconButton("player-skip", ICONS.forward10, "Forward 10 seconds"), () => this.jumpBy(10));
+    const back10 = onTap(iconButton("player-skip is-back", ICONS.back10, "Back 10 seconds"), () => {
+      if (this.jumpBy(-10)) spin(back10);
+    });
+    const fwd10 = onTap(iconButton("player-skip is-forward", ICONS.forward10, "Forward 10 seconds"), () => {
+      if (this.jumpBy(10)) spin(fwd10);
+    });
+    // Double-tapping a side: a ripple from that edge with the seconds, adding up.
+    this.skipEls = [-1, 1].map((side) => {
+      const label = h("div", { class: "skip-label" });
+      const icon = h("div", { class: "skip-icon" });
+      icon.innerHTML = side < 0 ? ICONS.back10 : ICONS.forward10;
+      return { el: h("div", { class: "player-skip-ripple " + (side < 0 ? "is-back" : "is-forward") }, [icon, label]), label, total: 0, at: 0 };
+    });
     this.elapsedEl = h("div", { class: "player-time" });
     this.remainingEl = h("div", { class: "player-time is-right" });
     this.bufferEl = h("div", { class: "bar-buffer" });
@@ -208,7 +234,7 @@ export class PlayerScreen implements Screen {
     this.errorEl = h("div", { class: "player-card player-error" });
     this.upNextEl = h("div", { class: "player-card player-upnext" });
     this.panelEl = h("div", { class: "player-panel" });
-    this.el = h("div", { class: "player" }, [this.stage, this.controls, this.noteEl, this.spinner, this.waitEl, this.errorEl, this.upNextEl, this.panelEl]);
+    this.el = h("div", { class: "player" }, [this.stage, ...this.skipEls.map((s) => s.el), this.controls, this.noteEl, this.spinner, this.waitEl, this.errorEl, this.upNextEl, this.panelEl]);
     if (!canPip(this.video)) this.pipButton.classList.add("is-hidden");
 
     this.listen();
@@ -296,8 +322,10 @@ export class PlayerScreen implements Screen {
     const now = Date.now();
     const width = this.el.clientWidth || 1;
     const side = event.clientX < width * 0.35 ? -1 : event.clientX > width * 0.65 ? 1 : 0;
-    if (now - this.lastTap < 300 && side !== 0 && this.started) {
-      this.jumpBy(side * 10);
+    // Right after a double tap, each further tap on that side adds 10 seconds more.
+    const skipping = side !== 0 && now - this.skipEls[side < 0 ? 0 : 1].at < SKIP_ADD_MS;
+    if ((skipping || now - this.lastTap < 300) && side !== 0 && this.started) {
+      if (this.jumpBy(side * 10, false)) this.skipRipple(side);
       this.lastTap = 0;
       return;
     }
@@ -645,10 +673,23 @@ export class PlayerScreen implements Screen {
 
   // --- Jumps --------------------------------------------------------------------------
 
-  private jumpBy(secs: number): void {
-    if (!this.started && this.route === "helper") return;
+  // False when it can't jump yet (the helper's stream hasn't started).
+  private jumpBy(secs: number, withControls = true): boolean {
+    if (!this.started && this.route === "helper") return false;
     this.seekTo(this.position + secs);
-    this.showControls();
+    if (withControls) this.showControls();
+    return true;
+  }
+
+  // The ripple on the side double-tapped, counting the seconds while taps keep coming.
+  private skipRipple(side: number): void {
+    const skip = this.skipEls[side < 0 ? 0 : 1];
+    const now = Date.now();
+    skip.total = now - skip.at < SKIP_ADD_MS ? skip.total + 10 : 10;
+    skip.at = now;
+    setText(skip.label, skip.total + " seconds");
+    replay(skip.el, "is-showing");
+    spin(skip.el);
   }
 
   private seekTo(target: number): void {
@@ -894,6 +935,10 @@ export class PlayerScreen implements Screen {
 
   private renderPlay(): void {
     const paused = this.video.paused;
+    if (paused === this.shownPaused) return;
+    // Play turning into pause (and back) pops, once it has been showing.
+    if (this.shownPaused !== null) replay(this.playButton, "is-popping");
+    this.shownPaused = paused;
     this.playButton.innerHTML = paused ? ICONS.play : ICONS.pause;
     this.playButton.setAttribute("aria-label", paused ? "Play" : "Pause");
   }
@@ -927,6 +972,7 @@ export class PlayerScreen implements Screen {
     this.bufferEl.style.left = from * 100 + "%";
     this.bufferEl.style.width = Math.max(0, reach - from) * 100 + "%";
     toggle(this.bubbleEl, "is-visible", this.dragging);
+    toggle(this.bar, "is-dragging", this.dragging);
     if (this.dragging) {
       setText(this.bubbleEl, formatClock(shown));
       this.bubbleEl.style.left = fraction * 100 + "%";

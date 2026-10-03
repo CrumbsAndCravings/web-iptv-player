@@ -13,9 +13,16 @@ import { helperKey } from "./data/helper";
 import { SearchLibrary } from "./data/library";
 import { ProgressSync } from "./data/sync";
 import { h, onTap, setText, toggle } from "./ui/dom";
+import { morph, reducedMotion } from "./ui/motion";
+
+const LEAVE_MS = 260; // a closing screen's slide out (base.css)
 
 export interface Screen {
   readonly el: HTMLElement;
+  // A page that grows out of what was tapped (Details out of its poster): `morphFrom` on
+  // the screen below, `morphTo` on this one, and back again when it closes.
+  readonly morphFrom?: HTMLElement | null;
+  readonly morphTo?: HTMLElement | null;
   // Called each time the screen comes back to the top (after Details closes, say).
   onShow?(): void;
   onHide?(): void;
@@ -37,6 +44,10 @@ export interface SheetOptions {
 
 export class App {
   private stack: Screen[] = [];
+  // A page change waiting for Safari to picture the page as it was (a frame or so, while
+  // a poster grows), and the changes asked for meanwhile, done after it in order.
+  private waiting = false;
+  private queued: (() => void)[] = [];
   private toastEl: HTMLElement;
   private toastTimer = 0;
   private sheetEl: HTMLElement | null = null;
@@ -54,7 +65,11 @@ export class App {
       const state = event.state as { aranplus?: number } | null;
       const depth = state && typeof state.aranplus === "number" ? state.aranplus : 0;
       if (this.sheetEl) this.closeSheet();
-      while (this.stack.length - 1 > depth && this.stack.length > 1) this.popTop();
+      this.inTurn(() => {
+        // One screen back grows back into its poster; several at once just close.
+        const count = this.stack.length - 1 - depth;
+        for (let i = 0; i < count && this.stack.length > 1; i++) this.popNow(count === 1);
+      });
     });
     try {
       window.history.replaceState({ aranplus: 0 }, "");
@@ -92,6 +107,37 @@ export class App {
   }
 
   push(screen: Screen): void {
+    this.inTurn(() => {
+      // Grown out of the poster where Safari can; slid in otherwise (the CSS).
+      if (this.stack.length > 0 && screen.morphFrom && screen.morphTo) {
+        screen.el.classList.add("is-morphed");
+        if (this.morphing(screen.morphFrom, screen.morphTo, () => this.place(screen))) return;
+        screen.el.classList.remove("is-morphed");
+      }
+      this.place(screen);
+    });
+  }
+
+  // Page changes happen one after another, never while one waits for Safari.
+  private inTurn(change: () => void): void {
+    if (this.waiting) this.queued.push(change);
+    else change();
+  }
+
+  private morphing(from: HTMLElement, to: HTMLElement, update: () => void): boolean {
+    this.waiting = true;
+    const started = morph(from, to, () => {
+      this.waiting = false;
+      update();
+      const queued = this.queued;
+      this.queued = [];
+      for (const change of queued) this.inTurn(change);
+    });
+    if (!started) this.waiting = false;
+    return started;
+  }
+
+  private place(screen: Screen): void {
     const below = this.top;
     if (below) {
       if (below.onHide) below.onHide();
@@ -115,21 +161,36 @@ export class App {
     if (this.stack.length <= 1) return;
     const state = window.history.state as { aranplus?: number } | null;
     if (state && typeof state.aranplus === "number" && state.aranplus === this.stack.length - 1) window.history.back();
-    else this.popTop();
+    else this.inTurn(() => this.popNow(true));
   }
 
-  private popTop(): void {
+  private popNow(mayMorph: boolean): void {
     if (this.stack.length <= 1) return;
+    const top = this.stack[this.stack.length - 1];
+    // Back into the poster it grew out of, when that's still there.
+    if (mayMorph && top.morphFrom && top.morphTo && this.morphing(top.morphTo, top.morphFrom, () => this.unplace(false))) return;
+    this.unplace(mayMorph && !reducedMotion());
+  }
+
+  // Closes the top screen; with `animate`, it slides away over the one below.
+  private unplace(animate: boolean): void {
     const top = this.stack.pop() as Screen;
     if (top.onHide) top.onHide();
     if (top.destroy) top.destroy();
-    if (top.el.parentNode) top.el.parentNode.removeChild(top.el);
     const below = this.top as Screen;
     below.el.classList.remove("is-covered");
+    if (animate && top.el.parentNode) {
+      top.el.classList.add("is-leaving");
+      window.setTimeout(() => top.el.parentNode && top.el.parentNode.removeChild(top.el), LEAVE_MS);
+    } else if (top.el.parentNode) top.el.parentNode.removeChild(top.el);
     if (below.onShow) below.onShow();
   }
 
   resetTo(screen: Screen): void {
+    this.inTurn(() => this.resetNow(screen));
+  }
+
+  private resetNow(screen: Screen): void {
     while (this.stack.length) {
       const s = this.stack.pop() as Screen;
       if (s.onHide) s.onHide();
@@ -141,7 +202,7 @@ export class App {
     } catch {
       // See the constructor.
     }
-    this.push(screen);
+    this.place(screen);
   }
 
   // A short note at the bottom of the screen.

@@ -10,6 +10,7 @@ import type { Item } from "../core/items";
 import { commas } from "../core/utils";
 import { h, iconButton, onTap, setText } from "../ui/dom";
 import { ICONS } from "../ui/icons";
+import { stagger } from "../ui/motion";
 import { posterEl } from "../ui/poster";
 import { DetailsScreen } from "./details";
 
@@ -133,7 +134,10 @@ export class CategoryScreen implements Screen {
   // The next page of posters.
   private more(): void {
     const until = Math.min(this.items.length, this.shown + PAGE);
+    const first = this.shown === 0;
     for (let i = this.shown; i < until; i++) this.grid.appendChild(posterEl(this.items[i], { open: (item) => this.app.push(new DetailsScreen(this.app, item)) }));
+    // The first screenful builds in; more further down just appears as you scroll.
+    if (first) stagger(this.grid.children, 12);
     this.shown = until;
   }
 }
