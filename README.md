@@ -75,6 +75,7 @@ Pull both repos, run `npm run build` here again, and restart the helper. The pho
 ## Good to know
 
 - **Away from the computer's Wi-Fi** (5G, another network), ARAN+ needs Tailscale on the computer and the phone; see [On 5G and any Wi-Fi](#on-5g-and-any-wi-fi-tailscale). The TV can't run Tailscale, so it has to reach the computer over the home network.
+- **What's kept, so it's quick:** Home's rows, the categories and the details you've opened stay on the phone, so ARAN+ opens at once and catches up in the background (a list is at most one launch behind; a series' episodes are checked again after 6 hours). The helper sends everything compressed, the phone keeps the app's files until a new build, and a film you go back to carries on with the pieces already made.
 - **The computer must be on, with the helper running,** while you browse and watch. If it isn't, ARAN+ says the helper didn't answer.
 - **One stream at a time.** The provider allows one connection, so the phone and the TV can't play at once; starting one stops the other.
 - **The computer's work.** For the phone, the helper converts the picture of every MKV and AVI to H.264, as fast as it can from where you are (so a film is usually converted well before you get there). It uses the graphics card or Intel Quick Sync when there is one, otherwise the processor; a recent processor manages several times faster than the film plays. MP4 files play as they are.
