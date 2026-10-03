@@ -325,6 +325,7 @@ export class PlayerScreen implements Screen {
     this.helperFromStart = false;
     this.convertTried = false;
     this.audioTrack = -1;
+    this.waitingForTap = false;
     const item = this.item;
     this.duration = item.durationSecs;
     this.resetSubtitles();
@@ -596,6 +597,8 @@ export class PlayerScreen implements Screen {
     this.stopSource();
     this.seeking = target;
     this.offset = target;
+    // A retry (or Try again) after a failed restart goes back to where the jump went.
+    this.startSecs = Math.floor(target);
     this.started = false;
     this.firstTime = -1;
     window.clearInterval(this.stuckTimer);
