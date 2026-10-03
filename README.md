@@ -58,13 +58,23 @@ You need the computer that runs the helper (the one you set up for the TV), with
 
 The link holds the helper's key, so keep it to yourself. If Windows asks whether Node.js may use the network, allow **private networks** (the TV needs that too).
 
+### On 5G and any Wi-Fi (Tailscale)
+
+The link above works on the computer's own Wi-Fi only: the phone can't reach the computer from 5G, and not from a second Wi-Fi either when that is a separate network (an extender in router mode, a guest network). [Tailscale](https://tailscale.com), free for personal use, joins your own devices in a private network wherever they are, so the computer has one address the phone reaches from anywhere. The video travels encrypted, directly between the two when it can, and nothing is opened to the internet.
+
+1. Install Tailscale on the computer ([tailscale.com/download](https://tailscale.com/download)) and sign in.
+2. Install Tailscale on the iPhone (App Store), sign in with the same account and turn it on. Leave it on.
+3. Restart the helper. It now shows a link starting with `http://100.` and its QR code: open that on the phone and add it to the Home Screen, in place of the old icon (each address keeps its own data on the phone; Continue Watching comes back through the sync service if you have it).
+
+From then on ARAN+ works on 5G, on the main Wi-Fi and on the extender's. On 5G a film uses roughly 2 to 4 GB an hour, sent from your home connection's upload. If the new link doesn't open, Windows may be treating Tailscale as a public network: in Windows Security, Firewall, "Allow an app through firewall", tick **Public** for Node.js.
+
 ### Updating
 
 Pull both repos, run `npm run build` here again, and restart the helper. The phone picks up the new version the next time it opens ARAN+.
 
 ## Good to know
 
-- **At home only, as it stands.** The phone reaches the helper over your Wi-Fi. To watch elsewhere, the phone needs a private route to the computer: [Tailscale](https://tailscale.com) on both is the simple way; then open `http://<the computer's Tailscale name>:8090/app/?key=...` instead.
+- **Away from the computer's Wi-Fi** (5G, another network), ARAN+ needs Tailscale on the computer and the phone; see [On 5G and any Wi-Fi](#on-5g-and-any-wi-fi-tailscale). The TV can't run Tailscale, so it has to reach the computer over the home network.
 - **The computer must be on, with the helper running,** while you browse and watch. If it isn't, ARAN+ says the helper didn't answer.
 - **One stream at a time.** The provider allows one connection, so the phone and the TV can't play at once; starting one stops the other.
 - **The computer's work.** For the phone, the helper converts the picture of every MKV and AVI to H.264, as fast as it can from where you are (so a film is usually converted well before you get there). It uses the graphics card or Intel Quick Sync when there is one, otherwise the processor; a recent processor manages several times faster than the film plays. MP4 files play as they are.
@@ -73,7 +83,7 @@ Pull both repos, run `npm run build` here again, and restart the helper. The pho
 
 ## Troubleshooting
 
-- **"The helper on your computer didn't answer"**: check the computer is on and awake, the helper's window is open, and the phone is on the same Wi-Fi. If the computer's address changed, the helper prints the new link; give the computer a fixed address in your router to stop that.
+- **"The helper on your computer didn't answer"**: check the computer is on and awake, the helper's window is open, and the phone is on the same Wi-Fi (or Tailscale is on, with the Tailscale link). If the computer's address changed, the helper prints the new link; give the computer a fixed address in your router to stop that (the Tailscale address doesn't change).
 - **"The key in this app's address doesn't match"**: the helper's key changed (a new `personal.json`). Open the new link from the helper, then add it to the Home Screen again.
 - **A video won't start**: the error card says why. "Your computer says" lines come from the helper and FFmpeg; "HTTP 403 from ..." lines come from your provider; "Safari:" says where the video was, how ready it was (0 to 4), what it had loaded and how many frames it showed. The helper's window says what it did: "Ready to play", then "The phone opened the stream" and "The phone is playing" once the phone asks for it.
 - **Settings** (the round button at the top right) has the recent log, with your account, server and keys hidden, so a screenshot is safe to share.
