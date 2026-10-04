@@ -82,17 +82,16 @@ export class SettingsScreen implements Screen {
       setText(logButton, "Refresh the log");
     });
 
-    // The intro when ARAN+ opens: with sound (which needs a tap first), without, or none.
+    // The intro when ARAN+ opens: on or off, and played now (with sound: it's a tap).
     const introChoices = h("div", { class: "pill-row" });
     const introNote = h("p", { class: "dim" });
     const showIntroChoice = () => {
       const mode = introMode();
       introChoices.querySelectorAll(".pill").forEach((pill) => toggle(pill as HTMLElement, "is-selected", (pill as HTMLElement).dataset.mode === mode));
-      setText(introNote, mode === "sound" ? "ARAN+ opens on a glowing plus: tap it for the intro and its sound (iPhones only play sound after a tap)." : mode === "silent" ? "The intro plays by itself, without sound." : "ARAN+ opens straight into Home.");
+      setText(introNote, mode === "on" ? "Plays while ARAN+ opens. iPhones keep it quiet then (no sound before a tap); Play it now plays it with its sound." : "ARAN+ opens straight into Home.");
     };
     for (const [mode, label] of [
-      ["sound", "With sound"],
-      ["silent", "Animation only"],
+      ["on", "On"],
       ["off", "Off"],
     ]) {
       introChoices.appendChild(

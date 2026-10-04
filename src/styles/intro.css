@@ -1,6 +1,6 @@
 /* The intro when ARAN+ opens (src/ui/intro.ts), in time with its sting (src/ui/sting.ts:
-   knock 0.1 s, boom 0.5 s, pings 0.68 and 0.82 s, whoosh 1.62 s). Waiting for a tap,
-   only the plus glows. */
+   knock 0.1 s, boom 0.5 s, pings 0.68 and 0.82 s). Then it holds, breathing, until the
+   app is ready, and flies through the plus into it (is-leaving, with the whoosh). */
 
 .intro {
   position: fixed;
@@ -11,8 +11,6 @@
   justify-content: center;
   overflow: hidden;
   background: radial-gradient(120% 90% at 50% 45%, #1d1638 0%, #0d0a1a 70%);
-  outline: none;
-  cursor: pointer;
   -webkit-user-select: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -71,34 +69,11 @@
   width: 0.18em;
   margin-left: -0.09em;
 }
-/* Waiting: the plus breathes, softly lit. */
-.intro.is-waiting .intro-plus-mark {
-  animation: plus-breathe 2.2s ease-in-out infinite;
-}
+/* Holding for the app: the plus breathes, softly lit. */
 @keyframes plus-breathe {
   50% {
     transform: scale(1.12);
     filter: drop-shadow(0 0 0.14em rgba(255, 158, 207, 1)) drop-shadow(0 0 0.4em rgba(255, 158, 207, 0.6));
-  }
-}
-.intro-hint {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(var(--safe-bottom) + 64px);
-  text-align: center;
-  font-family: var(--font-display);
-  font-size: 15px;
-  letter-spacing: 1px;
-  color: var(--text-dim);
-  opacity: 0;
-}
-.intro.is-waiting .intro-hint {
-  animation: hint-in 700ms ease-out 900ms forwards;
-}
-@keyframes hint-in {
-  to {
-    opacity: 1;
   }
 }
 
@@ -118,9 +93,10 @@
   }
 }
 .intro.is-playing .intro-letter {
-  animation:
-    letter-punch 560ms var(--ease-emphasized) calc(500ms + var(--i) * 32ms) both,
-    letter-out 260ms ease-in 1720ms forwards;
+  animation: letter-punch 560ms var(--ease-emphasized) calc(500ms + var(--i) * 32ms) both;
+}
+.intro.is-leaving .intro-letter {
+  animation: letter-out 260ms ease-in 60ms both;
 }
 @keyframes letter-punch {
   from {
@@ -146,7 +122,10 @@
   animation:
     plus-ping 300ms var(--ease-emphasized) 680ms,
     plus-ping 300ms var(--ease-emphasized) 820ms,
-    glow-off 200ms ease-out 1500ms forwards;
+    plus-breathe 2.2s ease-in-out 1300ms infinite;
+}
+.intro.is-leaving .intro-plus-mark {
+  animation: glow-off 160ms ease-out forwards;
 }
 @keyframes glow-off {
   to {
@@ -263,8 +242,8 @@
 }
 
 /* The whoosh: through the plus and into the app. */
-.intro.is-playing .intro-logo {
-  animation: fly-in 700ms cubic-bezier(0.5, 0, 0.75, 0) 1650ms forwards;
+.intro.is-leaving .intro-logo {
+  animation: fly-in 700ms cubic-bezier(0.5, 0, 0.75, 0) forwards;
 }
 @keyframes fly-in {
   to {
@@ -272,8 +251,8 @@
   }
 }
 /* Once the plus fills the screen, the app shows through it. */
-.intro.is-playing {
-  animation: intro-out 380ms ease-out 2120ms forwards;
+.intro.is-leaving {
+  animation: intro-out 380ms ease-out 470ms forwards;
 }
 @keyframes intro-out {
   to {

@@ -23,6 +23,7 @@ import { BACKDROP_SIZE } from "../core/xtream";
 import { ApiError } from "../data/api";
 import { h, onTap, toggle } from "../ui/dom";
 import { ICONS } from "../ui/icons";
+import { introReady } from "../ui/intro";
 import { fadeInBackground, noteTapped } from "../ui/motion";
 import { placeholders, PosterActions, rowEl } from "../ui/poster";
 import { CategoryScreen } from "./category";
@@ -138,6 +139,7 @@ export class BrowseView {
       if (this.plan.length === 0) {
         if (this.lastError) this.showError();
         else this.setStatus("Your provider didn't list anything here.", false);
+        if (this.mode === "home") introReady();
         return;
       }
       this.setStatus("", false);
@@ -182,6 +184,8 @@ export class BrowseView {
           // A See all tile ends the row; its page lists the whole category.
           const title = this.mode === "home" ? entry.title : entry.title + (entry.kind === "series" ? "  ·  Series" : "  ·  Movies");
           row.fill(loaded.items.concat([makeItem({ kind: "seeAll", title, categoryId: entry.categoryId, listKind: entry.kind })]));
+          // Something to show: the intro may fly into it.
+          if (this.mode === "home") introReady();
           if (this.mode === "home" && !this.heroItem) this.showHero(loaded.items[0]);
         })
         .catch((err: Error) => {
@@ -194,6 +198,7 @@ export class BrowseView {
           row.el.remove();
           if (!this.rowsEl.querySelector(".row:not(.is-continue)")) this.showError();
           else this.setStatus(this.errorText(), true);
+          if (this.mode === "home") introReady();
         });
     }
   }

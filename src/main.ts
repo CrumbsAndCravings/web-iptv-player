@@ -16,7 +16,7 @@ import { NO_HELPER, WRONG_KEY } from "./platform/http";
 import { ConnectScreen } from "./screens/connect";
 import { Shell } from "./screens/shell";
 import { h } from "./ui/dom";
-import { introMode, showIntro } from "./ui/intro";
+import { introMode, introReady, showIntro } from "./ui/intro";
 
 function stamp(creds: Creds | null): string {
   return creds ? creds.server.toLowerCase() + " " + creds.username : "";
@@ -37,7 +37,10 @@ function boot(): void {
     app.resetTo(new Shell(app));
   };
 
-  const showConnect = (reason: string) => app.resetTo(new ConnectScreen(reason, connect));
+  const showConnect = (reason: string) => {
+    app.resetTo(new ConnectScreen(reason, connect));
+    introReady();
+  };
 
   // Asks the helper for its settings. `shown`: the tabs are up already (from last time).
   const check = (shown: boolean) => {

@@ -8,8 +8,9 @@
 // as a file, or to test it).
 
 // When each part happens, in seconds from the start; the intro's animation keeps time
-// with these (intro.css uses the same numbers).
-export const BEAT = { knock: 0.1, boom: 0.5, pings: [0.68, 0.82], whoosh: 1.62 };
+// with these (intro.css uses the same numbers). The whoosh goes with the flight into
+// the app, whenever that is (playWhoosh).
+export const BEAT = { knock: 0.1, boom: 0.5, pings: [0.68, 0.82] };
 export const STING_SECONDS = 3.4; // until the chord has died away (the reverb rings on)
 const REVERB_SECONDS = 2.4;
 
@@ -97,15 +98,20 @@ export function playSting(ctx: BaseAudioContext, start = ctx.currentTime + 0.05)
     // A quieter, inharmonic partial makes it ring like metal.
     tone(ctx, "sine", t, 0.6, out, (f) => f.setValueAtTime(PINGS[i] * 2.76, t), envelope(0.04, 0.002, 0.5));
   });
+}
 
-  // --- The whoosh: noise swept up as the intro flies into the app.
-  const whoosh = start + BEAT.whoosh;
+// The whoosh: noise swept up as the intro flies into the app.
+export function playWhoosh(ctx: BaseAudioContext, at = ctx.currentTime + 0.02): void {
+  const out = ctx.createGain();
+  out.gain.value = 0.85;
+  out.connect(ctx.destination);
+  const whoosh = at;
   const sweep = ctx.createBiquadFilter();
   sweep.type = "bandpass";
   sweep.Q.value = 0.8;
   sweep.frequency.setValueAtTime(300, whoosh);
   sweep.frequency.exponentialRampToValueAtTime(5000, whoosh + 0.7);
-  sweep.connect(bus(0.35));
+  sweep.connect(out);
   const air = ctx.createBufferSource();
   air.buffer = noiseBuffer(ctx, 0.8);
   const airGain = ctx.createGain();
@@ -184,26 +190,41 @@ function impulse(ctx: BaseAudioContext, seconds: number): AudioBuffer {
   return buffer;
 }
 
-// Plays the sting now. Only from a tap: iPhones keep web pages quiet until touched. Like
-// the videos, it plays with the ring switch on silent.
-export function playStingNow(): void {
+// A place to play the sting, or null where there's no Web Audio. Started from a tap it
+// plays; at launch an iPhone keeps it silent (web pages are quiet until touched), and
+// whatever's played into it then goes unheard. Like the videos, it plays with the ring
+// switch on silent.
+export interface StingAudio {
+  ctx: AudioContext;
+  done(): void;
+}
+
+export function openStingAudio(): StingAudio | null {
   type Session = { type: string };
   const session = (navigator as unknown as { audioSession?: Session }).audioSession;
   try {
-    if (session) session.type = "playback";
     const Context = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Context) return;
+    if (!Context) return null;
+    if (session) session.type = "playback";
     const ctx = new Context();
-    void ctx.resume();
-    playSting(ctx);
-    window.setTimeout(
-      () => {
-        void ctx.close();
-        if (session) session.type = "auto";
+    void ctx.resume().catch(() => undefined);
+    let closed = false;
+    return {
+      ctx,
+      done() {
+        if (closed) return;
+        closed = true;
+        // After the reverb has rung out.
+        window.setTimeout(
+          () => {
+            void ctx.close().catch(() => undefined);
+            if (session) session.type = "auto";
+          },
+          (REVERB_SECONDS + 1) * 1000,
+        );
       },
-      (STING_SECONDS + REVERB_SECONDS + 0.5) * 1000,
-    );
+    };
   } catch {
-    // No sound here; the animation goes on without it.
+    return null;
   }
 }
