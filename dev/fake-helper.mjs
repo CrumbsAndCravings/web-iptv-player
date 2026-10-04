@@ -11,6 +11,8 @@
 // ready. With vod=1 (as the app asks), it lists the whole sample in six-second pieces
 // as the real helper does, converting it from the start and answering each piece once
 // it's made (the real one starts FFmpeg again for a jump; a sample is quick enough).
+// With ARANPLUS_DEV_SYNC set to a sync service's address (and ARANPLUS_DEV_SYNC_KEY to
+// its key, "dev" otherwise), the app syncs through it, as with "sync" in personal.json.
 
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -196,7 +198,7 @@ export function handleFakeHelper(req, res, port) {
         encoder: "libx264",
         account: { server: "http://localhost:" + port, username: "demo" },
         languages: (process.env.ARANPLUS_LANGUAGES || "en,hi,pa").split(",").filter(Boolean),
-        sync: null,
+        sync: process.env.ARANPLUS_DEV_SYNC ? { url: process.env.ARANPLUS_DEV_SYNC, key: process.env.ARANPLUS_DEV_SYNC_KEY || "dev" } : null,
       });
       return true;
     case "/v1/xtream": {

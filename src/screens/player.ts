@@ -30,7 +30,7 @@ import { redact } from "../core/redact";
 import { httpDetail, isRefusalCode } from "../core/refusals";
 import { Cue, parseSubtitles } from "../core/srt";
 import { loadOsAccount, loadPrefs, savePref } from "../core/storage";
-import { activeSubtitle, freshOnline, NUDGE_MS, OnlineStatus, SubtitleSource, subtitleMenu, subtitlePlan, tracksNote } from "../core/subtitles";
+import { activeSubtitle, freshOnline, NUDGE_MS, OnlineStatus, SavedSubtitle, savedCandidate, showsSaved, SubtitleSource, subtitleMenu, subtitlePlan, tracksNote } from "../core/subtitles";
 import { audioNowText, audioOptions, subtitleOptions, TrackOption } from "../core/tracks";
 import { codecLabel, describeCodecs, episodeCode, formatClock } from "../core/utils";
 import { currentOf, dueForSave, entryFor, finishedChange, hasNext, resumeFrom, saveAction, Watching } from "../core/watch";
@@ -48,6 +48,7 @@ const STUCK_MS = 45000; // playing, but the clock hasn't moved
 const RETRY_AFTER_MS = 1500; // lets the provider free the one connection first
 const UP_NEXT_SECS = 8;
 const AUTO_SUBTITLES_AFTER_MS = 2500;
+const DELAY_SAVE_MS = 3000; // nudges reach other devices once they stop for this long
 const SYNC_EVERY_MS = 5 * 60000;
 const CHECK_STREAM_MS = 10000;
 const SUBTITLE_REFRESH_MS = 15000; // the file's own subtitles grow while the helper works
@@ -155,6 +156,11 @@ export class PlayerScreen implements Screen {
   private fileCues: { [index: string]: Cue[] } = {};
   private textTrack: TextTrack | null = null;
   private osToken = 0;
+  private subsGen = 0; // which video the saved subtitles below belong to
+  private saved: SavedSubtitle | null = null; // saved for this title on the sync service
+  private savedLookup: Promise<SavedSubtitle | null> = Promise.resolve(null);
+  private delaySave: { title: string; fileId: string; delayMs: number } | null = null;
+  private delaySaveTimer = 0;
   private tracksApplied = false;
 
   private hideTimer = 0;
@@ -1123,8 +1129,10 @@ export class PlayerScreen implements Screen {
   // --- Tracks -----------------------------------------------------------------------
 
   private resetSubtitles(): void {
+    this.saveDelayNow();
     this.osToken++;
     this.online = freshOnline(loadOsAccount() !== null);
+    this.lookUpSaved();
     this.onlineCues = null;
     this.fileCues = {};
     this.subSource = { kind: "off" };
@@ -1181,9 +1189,11 @@ export class PlayerScreen implements Screen {
   private applyTrackChoices(): void {
     if (this.tracksApplied) return;
     this.tracksApplied = true;
-    const plan = subtitlePlan(loadPrefs().subtitles || "", this.embeddedOpts, this.online.configured);
+    const pref = loadPrefs().subtitles || "";
+    const plan = subtitlePlan(pref, this.embeddedOpts, this.online.configured);
+    const search = plan.kind === "online";
     if (plan.kind === "embedded") this.showFileSubtitles(plan.id);
-    else if (plan.kind === "online") this.autoTimer = window.setTimeout(() => this.startOnlineSearch(true), AUTO_SUBTITLES_AFTER_MS);
+    else if (search || showsSaved(pref, plan)) this.autoTimer = window.setTimeout(() => this.autoSubtitles(search), AUTO_SUBTITLES_AFTER_MS);
     log("tracks: audio", this.audioOpts.length, "subtitles", this.embeddedOpts.length - 1, "showing", plan.kind);
   }
 
@@ -1206,22 +1216,26 @@ export class PlayerScreen implements Screen {
       this.online.delayMs += id === "os:later" ? NUDGE_MS : -NUDGE_MS;
       this.subSource = { kind: "online", fileId: this.online.loadedFileId };
       this.rebuildCues();
+      this.saveDelaySoon();
     } else if (id.indexOf("os:file:") === 0) {
       const fileId = id.slice(8);
       if (fileId === this.online.loadedFileId && this.onlineCues) {
         this.subSource = { kind: "online", fileId };
         savePref("subtitles", "online");
         this.rebuildCues();
+      } else if (this.saved && fileId === this.saved.fileId) {
+        this.useSaved(this.saved);
+        savePref("subtitles", "online");
       } else this.downloadSubtitle(fileId);
     }
     this.renderPanel();
   }
 
-  // Back from the OpenSubtitles setup: pick up the account.
+  // Back from the OpenSubtitles setup: pick up the account (keeping what's showing).
   onShow(): void {
     const configured = loadOsAccount() !== null;
     if (configured !== this.online.configured) {
-      this.online = freshOnline(configured);
+      this.online.configured = configured;
       this.renderPanel();
     }
   }
@@ -1340,7 +1354,85 @@ export class PlayerScreen implements Screen {
       this.rebuildCues();
       log("online subtitles:", cues.length, "cues");
       this.renderPanel();
+      this.shareSubtitle(fileId, result.text);
     });
+  }
+
+  // --- Subtitles saved for every device (the sync service) ----------------------------
+
+  private lookUpSaved(): void {
+    const gen = ++this.subsGen;
+    this.saved = null;
+    const sync = this.app.sync;
+    this.savedLookup = sync ? sync.savedSubtitle(factsOf(this.item).key) : Promise.resolve(null);
+    this.savedLookup.then((saved) => {
+      if (gen !== this.subsGen || !saved) return;
+      this.saved = saved;
+      this.online.savedFileId = saved.fileId;
+      this.online.candidates = [savedCandidate(saved)].concat(this.online.candidates);
+      log("subtitles saved for this title:", saved.name || saved.fileId);
+      this.renderPanel();
+    });
+  }
+
+  // Where this device would show subtitles by itself: the ones saved for this title, or
+  // with `search`, the best match online.
+  private autoSubtitles(search: boolean): void {
+    const gen = this.subsGen;
+    this.savedLookup.then((saved) => {
+      if (gen !== this.subsGen || this.closing || this.failed || this.subSource.kind !== "off") return;
+      if (saved) this.useSaved(saved);
+      else if (search) this.startOnlineSearch(true);
+    });
+  }
+
+  private useSaved(saved: SavedSubtitle): void {
+    const cues = parseSubtitles(saved.text);
+    if (cues.length === 0) return;
+    this.osToken++; // a search or download still out is overtaken
+    if (this.online.state === "searching" || this.online.state === "downloading") this.online.state = this.online.candidates.some((c) => !c.saved) ? "results" : "idle";
+    this.online.loadedFileId = saved.fileId;
+    this.online.delayMs = saved.delayMs;
+    this.onlineCues = cues;
+    this.subSource = { kind: "online", fileId: saved.fileId };
+    window.clearInterval(this.subtitleTimer);
+    this.rebuildCues();
+    log("saved subtitles:", cues.length, "cues");
+    this.renderPanel();
+  }
+
+  // A download, saved for this title so other devices show it without one.
+  private shareSubtitle(fileId: string, text: string): void {
+    const sync = this.app.sync;
+    if (!sync) return;
+    const gen = this.subsGen;
+    const found = this.online.candidates.filter((c) => c.fileId === fileId && !c.saved)[0];
+    const subtitle: SavedSubtitle = { fileId, name: found ? found.release : "", delayMs: 0, text };
+    void sync.saveSubtitle(factsOf(this.item).key, subtitle).then((ok) => {
+      if (!ok || gen !== this.subsGen) return;
+      this.saved = subtitle;
+      this.online.savedFileId = fileId;
+      // What was saved before is replaced.
+      this.online.candidates = this.online.candidates.filter((c) => !c.saved);
+      this.renderPanel();
+    });
+  }
+
+  // Nudges of saved subtitles reach the other devices once they stop.
+  private saveDelaySoon(): void {
+    const fileId = this.online.loadedFileId;
+    if (!this.app.sync || !fileId || fileId !== this.online.savedFileId) return;
+    this.delaySave = { title: factsOf(this.item).key, fileId, delayMs: this.online.delayMs };
+    if (this.saved && this.saved.fileId === fileId) this.saved.delayMs = this.online.delayMs;
+    window.clearTimeout(this.delaySaveTimer);
+    this.delaySaveTimer = window.setTimeout(() => this.saveDelayNow(), DELAY_SAVE_MS);
+  }
+
+  private saveDelayNow(): void {
+    window.clearTimeout(this.delaySaveTimer);
+    const pending = this.delaySave;
+    this.delaySave = null;
+    if (pending && this.app.sync) void this.app.sync.saveSubtitleDelay(pending.title, pending.fileId, pending.delayMs);
   }
 
   // --- Leaving ----------------------------------------------------------------------
@@ -1353,6 +1445,7 @@ export class PlayerScreen implements Screen {
 
   destroy(): void {
     this.saveProgress();
+    this.saveDelayNow();
     this.closing = true;
     this.clearTimers();
     window.clearInterval(this.syncTimer);
