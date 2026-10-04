@@ -150,10 +150,9 @@
     background-color 200ms,
     box-shadow 200ms;
 }
+/* Following a finger it's moved every frame (glass-lens.ts), so nothing eases it. */
 .tab-lens.is-following {
   transition:
-    translate 70ms linear,
-    scale 110ms ease-out,
     background-color 200ms,
     box-shadow 200ms;
 }
@@ -188,9 +187,7 @@
     opacity 160ms;
 }
 .tab-lens.is-following .tab-lens-view {
-  transition:
-    translate 70ms linear,
-    opacity 160ms;
+  transition: opacity 160ms;
 }
 .tab-bar.is-pressed .tab-lens-view {
   opacity: 1;

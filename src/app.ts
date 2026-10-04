@@ -48,6 +48,9 @@ export class App {
   // a poster grows), and the changes asked for meanwhile, done after it in order.
   private waiting = false;
   private queued: (() => void)[] = [];
+  // A back the app asked for (its back buttons), which animates; any other (Safari's
+  // swipe from the edge, which has animated already) just shows the screen below.
+  private backFromApp = false;
   private toastEl: HTMLElement;
   private toastTimer = 0;
   private sheetEl: HTMLElement | null = null;
@@ -65,10 +68,13 @@ export class App {
       const state = event.state as { aranplus?: number } | null;
       const depth = state && typeof state.aranplus === "number" ? state.aranplus : 0;
       if (this.sheetEl) this.closeSheet();
+      const animate = this.backFromApp;
+      this.backFromApp = false;
       this.inTurn(() => {
-        // One screen back grows back into its poster; several at once just close.
+        // One screen back (from a back button) grows back into its poster; several at
+        // once, or Safari's swipe, just close.
         const count = this.stack.length - 1 - depth;
-        for (let i = 0; i < count && this.stack.length > 1; i++) this.popNow(count === 1);
+        for (let i = 0; i < count && this.stack.length > 1; i++) this.popNow(animate && count === 1);
       });
     });
     try {
@@ -160,8 +166,10 @@ export class App {
   back(): void {
     if (this.stack.length <= 1) return;
     const state = window.history.state as { aranplus?: number } | null;
-    if (state && typeof state.aranplus === "number" && state.aranplus === this.stack.length - 1) window.history.back();
-    else this.inTurn(() => this.popNow(true));
+    if (state && typeof state.aranplus === "number" && state.aranplus === this.stack.length - 1) {
+      this.backFromApp = true;
+      window.history.back();
+    } else this.inTurn(() => this.popNow(true));
   }
 
   private popNow(mayMorph: boolean): void {

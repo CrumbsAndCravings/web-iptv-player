@@ -14,8 +14,10 @@ const INSET = 4; // the lens's gap from the bar's edge (shell.css)
 const DRAG_START_PX = 8; // a press that moves this far is a drag, not a tap
 const LIFT_X = 1.08; // lifted under a finger: a little bigger, more so in height
 const LIFT_Y = 1.14;
-const SPEED_STRETCH = 0.2; // stretch per px/ms of speed
+const FOLLOW_MS = 26; // how closely it keeps up with the finger (a time constant)
+const SPEED_STRETCH = 0.22; // stretch per px/ms of its speed
 const MAX_SPEED_STRETCH = 0.45;
+const STRETCH_MS = 70; // how quickly the stretch comes and goes
 const OVERPULL_GIVE = 0.22; // how far it follows a finger past the ends
 const OVERPULL_STRETCH = 0.7; // stretch per lens-width pulled past the ends
 const MAX_OVERPULL_STRETCH = 0.55;
@@ -27,10 +29,13 @@ export class GlassLens {
   private index = 0; // the tab it rests on
   private start = -1; // where the finger went down, or -1
   private dragging = false;
-  private speed = 0; // px/ms, smoothed
-  private lastX = 0;
-  private lastAt = 0;
-  private relax = 0; // the frame easing the stretch when the finger pauses
+  private barLeft = 0; // the bar's left edge, when the finger went down
+  private fingerX = 0; // where the finger is now
+  private x = 0; // where the lens is now (px from the first tab), while following
+  private speed = 0; // its speed, px/ms, smoothed
+  private stretch = 1;
+  private frame = 0;
+  private lastFrame = 0;
   private under = -1;
   private ignoreClicksUntil = 0;
 
@@ -68,13 +73,12 @@ export class GlassLens {
     this.width = width;
     this.el.style.setProperty("--w", width + "px");
     this.el.style.setProperty("--h", this.el.offsetHeight + "px");
-    if (this.start < 0) this.place(this.index * width, 1, 1, true);
+    if (this.start < 0) this.place(this.index * width, 1, 1);
   }
 
-  // Where the lens is (`x` from the first tab, px) and its shape; `spring` eases it there
-  // with the wobble, otherwise it keeps up with a finger.
-  private place(x: number, sx: number, sy: number, spring: boolean): void {
-    this.el.classList.toggle("is-following", !spring);
+  // Where the lens is (`x` from the first tab, px) and its shape. Springing (the CSS)
+  // unless it's following a finger, when it's moved every frame instead.
+  private place(x: number, sx: number, sy: number): void {
     this.el.style.setProperty("--t", x.toFixed(1) + "px");
     this.el.style.setProperty("--sx", sx.toFixed(3));
     this.el.style.setProperty("--sy", sy.toFixed(3));
@@ -82,7 +86,8 @@ export class GlassLens {
 
   private settle(): void {
     if (!this.width) this.measure();
-    this.place(this.index * this.width, 1, 1, true);
+    this.el.classList.remove("is-following");
+    this.place(this.index * this.width, 1, 1);
   }
 
   private setUnder(index: number): void {
@@ -92,21 +97,6 @@ export class GlassLens {
       this.copies[i].classList.toggle("is-under", i === index);
     });
     this.under = index;
-  }
-
-  // The lens under a finger at `clientX`: following it, stretched by its speed and by
-  // how far past either end it's pulled.
-  private follow(clientX: number): void {
-    const rect = this.bar.getBoundingClientRect();
-    const width = this.width;
-    const last = (this.tabs.length - 1) * width;
-    const wanted = clientX - rect.left - INSET - width / 2;
-    const over = wanted < 0 ? wanted : wanted > last ? wanted - last : 0;
-    const x = Math.max(0, Math.min(last, wanted)) + over * OVERPULL_GIVE;
-    const stretch = 1 + Math.min(MAX_SPEED_STRETCH, Math.abs(this.speed) * SPEED_STRETCH) + Math.min(MAX_OVERPULL_STRETCH, (Math.abs(over) / width) * OVERPULL_STRETCH);
-    // Longer one way, thinner the other, as a stretched drop is.
-    this.place(x, LIFT_X * stretch, LIFT_Y / Math.sqrt(stretch), false);
-    this.setUnder(Math.round(Math.max(0, Math.min(last, wanted)) / width));
   }
 
   private listen(): void {
@@ -119,66 +109,89 @@ export class GlassLens {
       { capture: true },
     );
     bar.addEventListener("pointerdown", (event) => {
+      if (this.start >= 0) return; // a second finger
       if (!this.width) this.measure();
       if (!this.width) return;
       this.start = event.clientX;
+      this.fingerX = event.clientX;
       this.dragging = false;
-      this.speed = 0;
-      this.lastX = event.clientX;
-      this.lastAt = event.timeStamp;
+      this.barLeft = bar.getBoundingClientRect().left;
       bar.classList.add("is-pressed");
       // It lifts over the tab touched, and magnifies it.
-      const rect = bar.getBoundingClientRect();
-      const touched = Math.max(0, Math.min(this.tabs.length - 1, Math.floor((event.clientX - rect.left - INSET) / this.width)));
+      const touched = Math.max(0, Math.min(this.tabs.length - 1, Math.floor((event.clientX - this.barLeft - INSET) / this.width)));
       this.setUnder(touched);
-      this.place(touched * this.width, LIFT_X, LIFT_Y, true);
+      this.el.classList.remove("is-following");
+      this.place(touched * this.width, LIFT_X, LIFT_Y);
     });
     bar.addEventListener("pointermove", (event) => {
       if (this.start < 0) return;
-      if (!this.dragging && Math.abs(event.clientX - this.start) < DRAG_START_PX) return;
-      if (!this.dragging) {
-        this.dragging = true;
-        bar.setPointerCapture(event.pointerId);
-        this.relaxLoop();
-      }
-      const dt = Math.max(1, event.timeStamp - this.lastAt);
-      this.speed = this.speed * 0.6 + ((event.clientX - this.lastX) / dt) * 0.4;
-      this.lastX = event.clientX;
-      this.lastAt = event.timeStamp;
-      this.follow(event.clientX);
+      this.fingerX = event.clientX;
+      if (!this.dragging && Math.abs(event.clientX - this.start) >= DRAG_START_PX) this.startFollowing(event.pointerId);
     });
-    const end = (event: PointerEvent, cancelled: boolean) => {
-      if (this.start < 0) return;
-      const dragged = this.dragging;
-      this.start = -1;
-      this.dragging = false;
-      window.cancelAnimationFrame(this.relax);
-      bar.classList.remove("is-pressed");
-      const under = this.under;
-      this.setUnder(-1);
-      if (dragged && !cancelled) {
-        // The click that ends a drag isn't a tap.
-        this.ignoreClicksUntil = Date.now() + 400;
-        if (under >= 0 && under !== this.index) this.pick(under);
-      }
-      // Onto its tab (a tap's click picks it straight after), wobbling back into shape.
-      this.settle();
-      void event;
-    };
-    bar.addEventListener("pointerup", (event) => end(event, false));
-    bar.addEventListener("pointercancel", (event) => end(event, true));
+    // Safari may take a touch back (pointercancel) as it ends; a drag still chooses the
+    // tab it was dragged to.
+    bar.addEventListener("pointerup", () => this.end());
+    bar.addEventListener("pointercancel", () => this.end());
   }
 
-  // While dragging: when the finger slows or pauses, the stretch eases off.
-  private relaxLoop(): void {
-    const step = () => {
+  // From here the lens is moved every frame, after the finger: no transitions to restart
+  // on every movement, which made it hitch.
+  private startFollowing(pointerId: number): void {
+    this.dragging = true;
+    try {
+      this.bar.setPointerCapture(pointerId);
+    } catch {
+      // Not ours to capture; the bar still hears it.
+    }
+    // From wherever it is now (it may be springing to the tab first touched).
+    const now = parseFloat(getComputedStyle(this.el).getPropertyValue("translate"));
+    this.x = isFinite(now) ? now : this.under * this.width;
+    this.speed = 0;
+    this.stretch = 1;
+    this.el.classList.add("is-following");
+    this.lastFrame = performance.now();
+    const step = (time: number) => {
       if (!this.dragging) return;
-      if (performance.now() - this.lastAt > 40) {
-        this.speed *= 0.82;
-        this.follow(this.lastX);
-      }
-      this.relax = window.requestAnimationFrame(step);
+      this.follow(Math.min(50, Math.max(1, time - this.lastFrame)));
+      this.lastFrame = time;
+      this.frame = window.requestAnimationFrame(step);
     };
-    this.relax = window.requestAnimationFrame(step);
+    this.frame = window.requestAnimationFrame(step);
+  }
+
+  // One frame of following: towards the finger, stretched by its speed and by how far
+  // past either end it's pulled.
+  private follow(dt: number): void {
+    const width = this.width;
+    const last = (this.tabs.length - 1) * width;
+    const wanted = this.fingerX - this.barLeft - INSET - width / 2;
+    const over = wanted < 0 ? wanted : wanted > last ? wanted - last : 0;
+    const target = Math.max(0, Math.min(last, wanted)) + over * OVERPULL_GIVE;
+    const next = this.x + (target - this.x) * (1 - Math.exp(-dt / FOLLOW_MS));
+    this.speed = this.speed * 0.7 + ((next - this.x) / dt) * 0.3;
+    this.x = next;
+    const goal = 1 + Math.min(MAX_SPEED_STRETCH, Math.abs(this.speed) * SPEED_STRETCH) + Math.min(MAX_OVERPULL_STRETCH, (Math.abs(over) / width) * OVERPULL_STRETCH);
+    this.stretch += (goal - this.stretch) * (1 - Math.exp(-dt / STRETCH_MS));
+    // Longer one way, thinner the other, as a stretched drop is.
+    this.place(this.x, LIFT_X * this.stretch, LIFT_Y / Math.sqrt(this.stretch));
+    this.setUnder(Math.round(Math.max(0, Math.min(last, wanted)) / width));
+  }
+
+  private end(): void {
+    if (this.start < 0) return;
+    const dragged = this.dragging;
+    this.start = -1;
+    this.dragging = false;
+    window.cancelAnimationFrame(this.frame);
+    this.bar.classList.remove("is-pressed");
+    const under = this.under;
+    this.setUnder(-1);
+    if (dragged) {
+      // The click that ends a drag isn't a tap.
+      this.ignoreClicksUntil = Date.now() + 400;
+      if (under >= 0 && under !== this.index) this.pick(under);
+    }
+    // Onto its tab (a tap's click picks it straight after), wobbling back into shape.
+    this.settle();
   }
 }
