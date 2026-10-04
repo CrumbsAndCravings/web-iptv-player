@@ -8,11 +8,12 @@ import { LANGUAGE_NAMES } from "../core/categories";
 import { logLines } from "../core/log";
 import { accountCreds, helperVersion, languagePrefs } from "../core/personal";
 import { redact } from "../core/redact";
-import { loadOsAccount, readJson, regDelete, writeJson } from "../core/storage";
+import { loadOsAccount, readJson, regDelete, savePref, writeJson } from "../core/storage";
 import { isArr } from "../core/utils";
 import { deleteStoredLibrary } from "../data/library";
 import { h, iconButton, onTap, setText, toggle } from "../ui/dom";
 import { ICONS } from "../ui/icons";
+import { introMode, playIntroNow } from "../ui/intro";
 import { SubtitleSetupScreen } from "./subtitle-setup";
 
 const ENCODER_NAMES: { [name: string]: string } = {
@@ -81,6 +82,29 @@ export class SettingsScreen implements Screen {
       setText(logButton, "Refresh the log");
     });
 
+    // The intro when ARAN+ opens: with sound (which needs a tap first), without, or none.
+    const introChoices = h("div", { class: "pill-row" });
+    const introNote = h("p", { class: "dim" });
+    const showIntroChoice = () => {
+      const mode = introMode();
+      introChoices.querySelectorAll(".pill").forEach((pill) => toggle(pill as HTMLElement, "is-selected", (pill as HTMLElement).dataset.mode === mode));
+      setText(introNote, mode === "sound" ? "ARAN+ opens on a glowing plus: tap it for the intro and its sound (iPhones only play sound after a tap)." : mode === "silent" ? "The intro plays by itself, without sound." : "ARAN+ opens straight into Home.");
+    };
+    for (const [mode, label] of [
+      ["sound", "With sound"],
+      ["silent", "Animation only"],
+      ["off", "Off"],
+    ]) {
+      introChoices.appendChild(
+        onTap(h("button", { class: "pill", text: label, attrs: { type: "button", "data-mode": mode } }), () => {
+          savePref("intro", mode);
+          showIntroChoice();
+        }),
+      );
+    }
+    showIntroChoice();
+    const playIntro = onTap(h("button", { class: "button", text: "Play it now", attrs: { type: "button" } }), () => playIntroNow());
+
     const back = onTap(iconButton("round-button", ICONS.back, "Back"), () => this.app.back());
     this.el = h("div", { class: "page" }, [
       h("header", { class: "page-header" }, [back, h("h1", { class: "page-title", text: "Settings" })]),
@@ -88,6 +112,7 @@ export class SettingsScreen implements Screen {
         h("section", { class: "setting" }, [h("h2", { text: "Your setup" }), ...setup]),
         h("section", { class: "setting" }, [h("h2", { text: "Languages" }), h("p", { class: "dim", text: "Categories in these languages show on Home, in the tabs and in search." }), langList, this.langNote]),
         h("section", { class: "setting" }, [h("h2", { text: "Subtitles" }), subtitles]),
+        h("section", { class: "setting" }, [h("h2", { text: "Intro" }), introChoices, introNote, playIntro]),
         h("section", { class: "setting" }, [
           h("h2", { text: "Library" }),
           h("p", { class: "dim", text: "Search and category pages use a copy of your library kept on this phone, refreshed once a day." }),

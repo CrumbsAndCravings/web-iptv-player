@@ -16,6 +16,7 @@ import { NO_HELPER, WRONG_KEY } from "./platform/http";
 import { ConnectScreen } from "./screens/connect";
 import { Shell } from "./screens/shell";
 import { h } from "./ui/dom";
+import { introMode, showIntro } from "./ui/intro";
 
 function stamp(creds: Creds | null): string {
   return creds ? creds.server.toLowerCase() + " " + creds.username : "";
@@ -23,6 +24,8 @@ function stamp(creds: Creds | null): string {
 
 function boot(): void {
   log("ARAN+ for iPhone " + __APP_VERSION__ + " starting");
+  // The intro plays over the app while it opens underneath.
+  showIntro(introMode());
   window.addEventListener("error", (event) => logError("uncaught:", event.message, event.filename + ":" + event.lineno));
   window.addEventListener("unhandledrejection", (event) => logError("unhandled rejection:", String(event.reason)));
   const root = document.getElementById("app");

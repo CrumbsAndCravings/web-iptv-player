@@ -228,3 +228,11 @@
     transform: rotate(360deg);
   }
 }
+
+/* A choice of a few, as pills in a row (Settings' intro). */
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 10px;
+}

@@ -33,6 +33,12 @@ async function shot(name) {
 }
 
 await page.goto(`http://localhost:${port}/`);
+// The intro waits on its glowing plus for a tap (it has sound); then it plays.
+await page.waitForSelector(".intro.is-waiting");
+await wait(1700);
+await shot("00-intro");
+await page.click(".intro");
+await page.waitForSelector(".intro", { state: "detached", timeout: 6000 });
 await page.waitForSelector(".row .poster:not(.is-placeholder)", { timeout: 15000 });
 await wait(800);
 await shot("01-home");
