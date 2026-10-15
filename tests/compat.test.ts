@@ -1,7 +1,7 @@
 // Which way a title plays on the phone (core/compat.ts): as it is, or through the helper.
 import { beforeEach, describe, expect, it } from "vitest";
-import { helperVideoMode, learnMode, needsHelper, playRoute, rememberNeedsHelper, routeNote } from "../src/core/compat";
-import { MemoryStore, useStore } from "../src/core/storage";
+import { helperVideoMode, learnedMode, learnMode, needsHelper, playRoute, rememberNeedsHelper, routeNote } from "../src/core/compat";
+import { MemoryStore, useStore, writeJson } from "../src/core/storage";
 
 const file = (ext: string, videoCodec = "", audioCodec = "", key = "m:1") => ({ key, ext, videoCodec, audioCodec });
 
@@ -36,8 +36,9 @@ describe("the way a title plays", () => {
     expect(routeNote(file("mp4", "h264", "aac"), "helper")).toMatch(/didn't play on its own last time/);
   });
 
-  it("says why the helper converts a file", () => {
-    expect(routeNote(file("mkv"), "helper")).toBe("MKV files don't play in Safari, so the helper on your computer converts this one while you watch.");
+  it("says why a file plays through the helper", () => {
+    expect(routeNote(file("mkv"), "helper")).toBe("MKV files don't play in Safari on their own, so this one plays through the helper on your computer.");
+    expect(routeNote(file("mp4", "hevc", "aac"), "helper")).toBe("This file plays through the helper on your computer.");
     expect(routeNote(file("mp4", "h264", "aac"), "direct")).toBe("");
   });
 
@@ -47,5 +48,13 @@ describe("the way a title plays", () => {
     learnMode("hevc", "convert");
     expect(helperVideoMode("HEVC")).toBe("convert");
     expect(helperVideoMode("h264")).toBe("copy");
+  });
+
+  it("forgets what the helper's first playlists taught", () => {
+    // Learned under the old name, when Safari started none of the growing playlists.
+    writeJson("helper", "modes", { hevc: "convert", h264: "convert" });
+    expect(helperVideoMode("hevc")).toBe("copy");
+    expect(helperVideoMode("h264")).toBe("copy");
+    expect(learnedMode("hevc")).toBe("");
   });
 });
