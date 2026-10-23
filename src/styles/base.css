@@ -166,6 +166,19 @@ p {
 .round-button:active {
   background: var(--pill-selected);
 }
+@media (prefers-reduced-transparency: reduce) {
+  .round-button {
+    background: var(--surface-2);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+@media (prefers-contrast: more) {
+  .round-button {
+    background: rgb(21, 16, 40);
+    box-shadow: inset 0 0 0 1.5px rgba(247, 243, 255, 0.8);
+  }
+}
 
 /* Text boxes: 16 px, so Safari doesn't zoom in when one is tapped. */
 .field {
